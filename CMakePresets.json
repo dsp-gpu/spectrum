@@ -8,7 +8,8 @@
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "FETCHCONTENT_SOURCE_DIR_DSPCORE": "E:/DSP-GPU/core",
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }
     },
     {
@@ -19,7 +20,8 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_PREFIX_PATH": "/opt/rocm",
-        "FETCHCONTENT_SOURCE_DIR_DSPCORE": "${sourceDir}/../core"
+        "FETCHCONTENT_SOURCE_DIR_DSPCORE": "${sourceDir}/../core",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }
     },
     {
@@ -36,5 +38,10 @@
     { "name": "local-dev",        "configurePreset": "local-dev"        },
     { "name": "debian-local-dev", "configurePreset": "debian-local-dev" },
     { "name": "ci",               "configurePreset": "ci"               }
+  ],
+  "testPresets": [
+    { "name": "local-dev",        "configurePreset": "local-dev",        "output": { "outputOnFailure": true } },
+    { "name": "debian-local-dev", "configurePreset": "debian-local-dev", "output": { "outputOnFailure": true } },
+    { "name": "ci",               "configurePreset": "ci",               "output": { "outputOnFailure": true } }
   ]
 }
