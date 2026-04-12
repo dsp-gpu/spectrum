@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "kernels": [
+    {
+      "name": "lch_farrow_delay",
+      "comment": "lch_farrow_delay hiprtc kernel",
+      "created": "2026-03-10T10:57:40",
+      "params": "",
+      "backend": "rocm"
+    },
+    {
+      "name": "LchFarrow_kernels",
+      "comment": "LchFarrow hiprtc kernels",
+      "created": "2026-03-23T12:18:48",
+      "params": "",
+      "backend": "rocm"
+    }
+  ]
+}

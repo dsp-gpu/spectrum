@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "kernels": [
+    {
+      "name": "moving_average_kernels_rocm",
+      "comment": "MA filters: SMA/EMA/MMA/DEMA/TEMA",
+      "created": "2026-03-05T07:36:07",
+      "params": "gfx1201",
+      "backend": "rocm"
+    },
+    {
+      "name": "kalman_kernel_rocm",
+      "comment": "1D scalar Kalman filter",
+      "created": "2026-03-05T07:36:07",
+      "params": "gfx1201",
+      "backend": "rocm"
+    },
+    {
+      "name": "kaufman_kernel_rocm",
+      "comment": "KAMA (Kaufman Adaptive MA)",
+      "created": "2026-03-05T07:36:07",
+      "params": "gfx1201",
+      "backend": "rocm"
+    },
+    {
+      "name": "fir_filter_cf32",
+      "comment": "FIR direct-form",
+      "created": "2026-03-08T07:49:10",
+      "params": "",
+      "backend": "opencl"
+    },
+    {
+      "name": "iir_filter_cf32",
+      "comment": "IIR biquad cascade",
+      "created": "2026-03-08T07:49:10",
+      "params": "",
+      "backend": "opencl"
+    },
+    {
+      "name": "fir_filter_cf32_rocm",
+      "comment": "FIR direct-form convolution",
+      "created": "2026-03-10T11:12:26",
+      "params": "gfx1201",
+      "backend": "rocm"
+    },
+    {
+      "name": "iir_biquad_cascade_rocm",
+      "comment": "IIR biquad cascade",
+      "created": "2026-03-10T11:12:26",
+      "params": "gfx1201",
+      "backend": "rocm"
+    },
+    {
+      "name": "moving_average_kernels_rocm_N10",
+      "comment": "MA filters: SMA/EMA/MMA/DEMA/TEMA",
+      "created": "2026-03-16T15:19:23",
+      "params": "gfx1201",
+      "backend": "rocm"
+    },
+    {
+      "name": "moving_average_kernels_rocm_N8",
+      "comment": "MA filters: SMA/EMA/MMA/DEMA/TEMA",
+      "created": "2026-03-16T15:19:23",
+      "params": "gfx1201",
+      "backend": "rocm"
+    },
+    {
+      "name": "kaufman_kernel_rocm_N10",
+      "comment": "KAMA (Kaufman Adaptive MA)",
+      "created": "2026-03-16T15:19:23",
+      "params": "gfx1201",
+      "backend": "rocm"
+    },
+    {
+      "name": "FIR_kernels",
+      "comment": "FIR hiprtc kernels",
+      "created": "2026-03-23T10:40:16",
+      "params": "",
+      "backend": "rocm"
+    },
+    {
+      "name": "IIR_kernels",
+      "comment": "IIR hiprtc kernels",
+      "created": "2026-03-23T10:40:17",
+      "params": "",
+      "backend": "rocm"
+    },
+    {
+      "name": "SMA_kernels",
+      "comment": "SMA hiprtc kernels",
+      "created": "2026-03-23T10:40:17",
+      "params": "",
+      "backend": "rocm"
+    },
+    {
+      "name": "Kalman_kernels",
+      "comment": "Kalman hiprtc kernels",
+      "created": "2026-03-23T10:40:17",
+      "params": "",
+      "backend": "rocm"
+    },
+    {
+      "name": "KAMA_kernels",
+      "comment": "KAMA hiprtc kernels",
+      "created": "2026-03-23T10:40:17",
+      "params": "",
+      "backend": "rocm"
+    }
+  ]
+}

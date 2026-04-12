@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "kernels": [
+    {
+      "name": "FFTProc_kernels",
+      "comment": "ROCm FFTProcessorROCm hiprtc kernels",
+      "created": "2026-03-16T16:11:00",
+      "params": "",
+      "backend": "rocm"
+    },
+    {
+      "name": "c2mp_kernels",
+      "comment": "ROCm complex_to_mag_phase hiprtc kernel",
+      "created": "2026-03-02T12:34:22",
+      "params": "",
+      "backend": "rocm"
+    },
+    {
+      "name": "all_maxima_kernels",
+      "comment": "all_maxima: detect + scan + add + compact",
+      "created": "2026-03-16T10:47:46",
+      "params": "gfx1201",
+      "backend": "rocm"
+    },
+    {
+      "name": "spectrum_kernels",
+      "comment": "spectrum_kernels: pad_data + compute_magnitudes",
+      "created": "2026-03-16T10:48:17",
+      "params": "gfx1201",
+      "backend": "rocm"
+    },
+    {
+      "name": "C2MP_kernels",
+      "comment": "C2MP hiprtc kernels",
+      "created": "2026-03-23T10:39:05",
+      "params": "",
+      "backend": "rocm"
+    },
+    {
+      "name": "SpectrumMaxima_kernels",
+      "comment": "SpectrumMaxima hiprtc kernels",
+      "created": "2026-03-23T10:39:47",
+      "params": "",
+      "backend": "rocm"
+    }
+  ]
+}
