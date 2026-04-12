@@ -1,0 +1,46 @@
+include_guard(GLOBAL)
+include(FetchContent)
+
+set(DSP_CORE_TAG              "v0.1.0" CACHE STRING "Tag for DspCore")
+set(DSP_SPECTRUM_TAG          "v0.1.0" CACHE STRING "Tag for DspSpectrum")
+set(DSP_STATS_TAG             "v0.1.0" CACHE STRING "Tag for DspStats")
+set(DSP_SIGNAL_GENERATORS_TAG "v0.1.0" CACHE STRING "Tag for DspSignalGenerators")
+set(DSP_HETERODYNE_TAG        "v0.1.0" CACHE STRING "Tag for DspHeterodyne")
+set(DSP_LINALG_TAG            "v0.1.0" CACHE STRING "Tag for DspLinalg")
+set(DSP_RADAR_TAG             "v0.1.0" CACHE STRING "Tag for DspRadar")
+set(DSP_STRATEGIES_TAG        "v0.1.0" CACHE STRING "Tag for DspStrategies")
+
+function(dsp_fetch_package name repo tag_var)
+  FetchContent_Declare(${name}
+    GIT_REPOSITORY https://github.com/dsp-gpu/${repo}.git
+    GIT_TAG        ${${tag_var}}
+    GIT_SHALLOW    TRUE
+    FIND_PACKAGE_ARGS NAMES ${name} CONFIG
+  )
+  FetchContent_MakeAvailable(${name})
+endfunction()
+
+macro(fetch_dsp_core)
+  dsp_fetch_package(DspCore core DSP_CORE_TAG)
+endmacro()
+macro(fetch_dsp_spectrum)
+  dsp_fetch_package(DspSpectrum spectrum DSP_SPECTRUM_TAG)
+endmacro()
+macro(fetch_dsp_stats)
+  dsp_fetch_package(DspStats stats DSP_STATS_TAG)
+endmacro()
+macro(fetch_dsp_signal_generators)
+  dsp_fetch_package(DspSignalGenerators signal_generators DSP_SIGNAL_GENERATORS_TAG)
+endmacro()
+macro(fetch_dsp_heterodyne)
+  dsp_fetch_package(DspHeterodyne heterodyne DSP_HETERODYNE_TAG)
+endmacro()
+macro(fetch_dsp_linalg)
+  dsp_fetch_package(DspLinalg linalg DSP_LINALG_TAG)
+endmacro()
+macro(fetch_dsp_radar)
+  dsp_fetch_package(DspRadar radar DSP_RADAR_TAG)
+endmacro()
+macro(fetch_dsp_strategies)
+  dsp_fetch_package(DspStrategies strategies DSP_STRATEGIES_TAG)
+endmacro()

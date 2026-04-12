@@ -1,0 +1,9 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(DspCore REQUIRED)
+find_dependency(hip     REQUIRED)   # lowercase — Linux case-sensitive!
+find_dependency(hipfft  REQUIRED)
+
+include("${CMAKE_CURRENT_LIST_DIR}/DspSpectrumTargets.cmake")
+check_required_components(DspSpectrum)
