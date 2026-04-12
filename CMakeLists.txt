@@ -17,7 +17,20 @@ add_library(DspSpectrum STATIC)
 add_library(DspSpectrum::DspSpectrum ALIAS DspSpectrum)
 
 target_sources(DspSpectrum PRIVATE
-  # Phase 1 skeleton — sources added in Phase 2
+  # fft_func
+  src/fft_func/src/fft_processor_rocm.cpp
+  src/fft_func/src/complex_to_mag_phase_rocm.cpp
+  src/fft_func/src/spectrum_processor_rocm.cpp
+  src/fft_func/src/all_maxima_pipeline_rocm.cpp
+  src/fft_func/src/spectrum_processor_factory.cpp
+  # filters
+  src/filters/src/fir_filter_rocm.cpp
+  src/filters/src/iir_filter_rocm.cpp
+  src/filters/src/kalman_filter_rocm.cpp
+  src/filters/src/kaufman_filter_rocm.cpp
+  src/filters/src/moving_average_filter_rocm.cpp
+  # lch_farrow
+  src/lch_farrow/src/lch_farrow_rocm.cpp
 )
 
 target_include_directories(DspSpectrum
@@ -25,6 +38,11 @@ target_include_directories(DspSpectrum
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
   PRIVATE
+    # Внутренние include каждого субмодуля
+    src/fft_func/include
+    src/filters/include
+    src/lch_farrow/include
+    # Kernels — hiprtc runtime, не компилируем, но include нужен
     kernels/
     src
 )
