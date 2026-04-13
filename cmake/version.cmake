@@ -1,0 +1,204 @@
+# =============================================================================
+# version.cmake — Запускается при КАЖДОЙ сборке через add_custom_target
+#
+# Вызов:
+#   cmake -D SRC_DIR=...
+#         -D BIN_DIR=...
+#         -D GIT_EXECUTABLE=...
+#         -D MODULE_PREFIX=DSPCORE
+#         -P version.cmake
+#
+# Принцип: сравниваем git HEAD с сохранённым hash.
+#   СОВПАЛ    → return() — ни один файл не тронут → zero rebuild
+#   ИЗМЕНИЛСЯ → генерируем version.h + version.json → downstream пересобирается
+#
+# Шаблоны (.in) НЕ нужны — всё генерируется прямо здесь.
+# Добавить формат = дописать блок file(WRITE ...) + copy_if_different.
+# =============================================================================
+
+# --- 0. Defaults ---
+if(NOT DEFINED MODULE_PREFIX)
+    set(MODULE_PREFIX "PROJECT")
+endif()
+
+set(_gen_dir "${BIN_DIR}/generated")
+file(MAKE_DIRECTORY "${_gen_dir}")
+
+# --- 1. Текущий commit hash ---
+execute_process(
+    COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+    WORKING_DIRECTORY "${SRC_DIR}"
+    OUTPUT_VARIABLE GIT_HASH_FULL
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+    RESULT_VARIABLE GIT_RESULT
+)
+
+if(NOT GIT_RESULT EQUAL 0)
+    # Нет git (zip-архив, отсутствует .git)
+    set(GIT_HASH_FULL "unknown")
+    set(GIT_HASH_SHORT "unknown")
+    set(GIT_TAG        "v0.0.0")
+    set(GIT_BRANCH     "unknown")
+    set(GIT_COMMITS    "0")
+    set(GIT_DATE       "unknown")
+    set(GIT_DESCRIBE   "v0.0.0-unknown")
+    set(VERSION_MAJOR  0)
+    set(VERSION_MINOR  0)
+    set(VERSION_PATCH  0)
+    message(STATUS "[version] Git not available, using defaults")
+else()
+    # Short hash
+    string(SUBSTRING "${GIT_HASH_FULL}" 0 7 GIT_HASH_SHORT)
+
+    # --- 2. Сравнение с предыдущим hash → early exit ---
+    set(_hash_file "${_gen_dir}/.git_hash")
+    if(EXISTS "${_hash_file}")
+        file(READ "${_hash_file}" _prev_hash)
+        string(STRIP "${_prev_hash}" _prev_hash)
+    else()
+        set(_prev_hash "")
+    endif()
+
+    if(GIT_HASH_FULL STREQUAL _prev_hash
+       AND EXISTS "${_gen_dir}/version.h")
+        message(STATUS "[version] ${GIT_HASH_SHORT} — no changes")
+        return()
+    endif()
+
+    # === Hash изменился — собираем полные данные ===
+    message(STATUS "[version] ${_prev_hash} -> ${GIT_HASH_FULL}")
+    file(WRITE "${_hash_file}" "${GIT_HASH_FULL}")
+
+    # --- 3. Branch ---
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} rev-parse --abbrev-ref HEAD
+        WORKING_DIRECTORY "${SRC_DIR}"
+        OUTPUT_VARIABLE GIT_BRANCH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+
+    # --- 4. Tag (nearest annotated tag) ---
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} describe --tags --abbrev=0
+        WORKING_DIRECTORY "${SRC_DIR}"
+        OUTPUT_VARIABLE GIT_TAG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE TAG_RESULT
+    )
+    if(NOT TAG_RESULT EQUAL 0)
+        set(GIT_TAG "v0.0.0")
+    endif()
+
+    # --- 5. git describe (полное: v1.2.3-15-gabc1234) ---
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} describe --tags --always
+        WORKING_DIRECTORY "${SRC_DIR}"
+        OUTPUT_VARIABLE GIT_DESCRIBE
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+
+    # --- 6. Commits since tag ---
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} rev-list ${GIT_TAG}..HEAD --count
+        WORKING_DIRECTORY "${SRC_DIR}"
+        OUTPUT_VARIABLE GIT_COMMITS
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE COMMITS_RESULT
+    )
+    if(NOT COMMITS_RESULT EQUAL 0)
+        set(GIT_COMMITS "0")
+    endif()
+
+    # --- 7. Commit date ---
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} log -1 --format=%ci
+        WORKING_DIRECTORY "${SRC_DIR}"
+        OUTPUT_VARIABLE GIT_DATE
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+
+    # --- 8. Parse SemVer from tag ---
+    string(REGEX REPLACE "^v" "" CLEAN_TAG "${GIT_TAG}")
+    if(CLEAN_TAG MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)")
+        set(VERSION_MAJOR "${CMAKE_MATCH_1}")
+        set(VERSION_MINOR "${CMAKE_MATCH_2}")
+        set(VERSION_PATCH "${CMAKE_MATCH_3}")
+    else()
+        set(VERSION_MAJOR 0)
+        set(VERSION_MINOR 0)
+        set(VERSION_PATCH 0)
+    endif()
+endif()
+
+# --- 9. Составная строка версии ---
+set(VERSION_STRING "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
+if(GIT_COMMITS GREATER 0)
+    string(APPEND VERSION_STRING ".${GIT_COMMITS}")
+endif()
+set(VERSION_FULL "${VERSION_STRING}-${GIT_HASH_SHORT}")
+
+message(STATUS "[version] ${MODULE_PREFIX} ${VERSION_FULL} (${GIT_BRANCH})")
+
+# =============================================================================
+# Генерация файлов — file(WRITE) → tmp, затем copy_if_different
+# =============================================================================
+
+# --- C++ header (с namespace модуля) ---
+file(WRITE "${_gen_dir}/version.h.tmp"
+"/**
+ * @file version.h
+ * @brief Auto-generated by cmake/version.cmake — DO NOT EDIT
+ */
+#ifndef ${MODULE_PREFIX}_VERSION_H
+#define ${MODULE_PREFIX}_VERSION_H
+
+/* SemVer */
+#define ${MODULE_PREFIX}_VERSION_MAJOR    ${VERSION_MAJOR}
+#define ${MODULE_PREFIX}_VERSION_MINOR    ${VERSION_MINOR}
+#define ${MODULE_PREFIX}_VERSION_PATCH    ${VERSION_PATCH}
+#define ${MODULE_PREFIX}_VERSION_STRING   \"${VERSION_STRING}\"
+#define ${MODULE_PREFIX}_VERSION_FULL     \"${VERSION_FULL}\"
+
+/* Git metadata */
+#define ${MODULE_PREFIX}_GIT_HASH_SHORT   \"${GIT_HASH_SHORT}\"
+#define ${MODULE_PREFIX}_GIT_HASH_FULL    \"${GIT_HASH_FULL}\"
+#define ${MODULE_PREFIX}_GIT_BRANCH       \"${GIT_BRANCH}\"
+#define ${MODULE_PREFIX}_GIT_TAG          \"${GIT_TAG}\"
+#define ${MODULE_PREFIX}_GIT_DESCRIBE     \"${GIT_DESCRIBE}\"
+#define ${MODULE_PREFIX}_GIT_COMMITS      ${GIT_COMMITS}
+#define ${MODULE_PREFIX}_GIT_DATE         \"${GIT_DATE}\"
+
+#endif /* ${MODULE_PREFIX}_VERSION_H */
+")
+
+# --- JSON (Python, конфиги, любой язык) ---
+file(WRITE "${_gen_dir}/version.json.tmp"
+"{
+  \"module\": \"${MODULE_PREFIX}\",
+  \"version\": \"${VERSION_STRING}\",
+  \"version_full\": \"${VERSION_FULL}\",
+  \"major\": ${VERSION_MAJOR},
+  \"minor\": ${VERSION_MINOR},
+  \"patch\": ${VERSION_PATCH},
+  \"git_hash\": \"${GIT_HASH_SHORT}\",
+  \"git_hash_full\": \"${GIT_HASH_FULL}\",
+  \"git_branch\": \"${GIT_BRANCH}\",
+  \"git_tag\": \"${GIT_TAG}\",
+  \"git_describe\": \"${GIT_DESCRIBE}\",
+  \"git_commits\": ${GIT_COMMITS},
+  \"git_date\": \"${GIT_DATE}\"
+}
+")
+
+# --- Копируем только если содержимое изменилось ---
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${_gen_dir}/version.h.tmp" "${_gen_dir}/version.h")
+execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${_gen_dir}/version.json.tmp" "${_gen_dir}/version.json")
+
+# --- Чистим tmp ---
+file(REMOVE "${_gen_dir}/version.h.tmp" "${_gen_dir}/version.json.tmp")
