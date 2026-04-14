@@ -11,10 +11,10 @@
 
 #if ENABLE_ROCM
 
-#include "filters/iir_filter_rocm.hpp"
+#include <spectrum/filters/iir_filter_rocm.hpp>
 #include "kernels/iir_kernels_rocm.hpp"
 #include "rocm_profiling_helpers.hpp"
-#include "services/console_output.hpp"
+#include <core/services/console_output.hpp>
 
 #include <stdexcept>
 #include <cstring>

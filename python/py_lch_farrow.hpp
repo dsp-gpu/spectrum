@@ -13,7 +13,7 @@
  * @date 2026-02-18
  */
 
-#include "lch_farrow.hpp"
+#include <spectrum/lch_farrow.hpp>
 
 // ============================================================================
 // PyLchFarrow — standalone fractional delay processor

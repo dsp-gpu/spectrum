@@ -16,7 +16,7 @@
  * @date 2026-02-24
  */
 
-#include "lch_farrow_rocm.hpp"
+#include <spectrum/lch_farrow_rocm.hpp>
 
 // ============================================================================
 // PyLchFarrowROCm — standalone fractional delay processor (ROCm)

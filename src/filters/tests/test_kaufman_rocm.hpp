@@ -32,7 +32,7 @@
 
 #if ENABLE_ROCM
 
-#include "filters/kaufman_filter_rocm.hpp"
+#include <spectrum/filters/kaufman_filter_rocm.hpp>
 #include "backends/rocm/rocm_backend.hpp"
 #include "backends/rocm/rocm_core.hpp"
 

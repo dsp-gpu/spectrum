@@ -21,7 +21,7 @@
 
 #if ENABLE_ROCM
 
-#include "interface/input_data.hpp"
+#include <core/interface/input_data.hpp>
 
 #include <hip/hip_runtime.h>
 

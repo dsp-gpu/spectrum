@@ -17,8 +17,8 @@
 
 #if ENABLE_ROCM
 
-#include "filters/fir_filter_rocm.hpp"
-#include "filters/iir_filter_rocm.hpp"
+#include <spectrum/filters/fir_filter_rocm.hpp>
+#include <spectrum/filters/iir_filter_rocm.hpp>
 #include "DrvGPU/services/gpu_benchmark_base.hpp"
 
 #include <complex>

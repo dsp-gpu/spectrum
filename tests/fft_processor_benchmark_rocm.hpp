@@ -27,8 +27,8 @@
 
 #if ENABLE_ROCM
 
-#include "fft_processor_rocm.hpp"
-#include "DrvGPU/services/gpu_benchmark_base.hpp"
+#include <spectrum/fft_processor_rocm.hpp>
+#include <core/services/gpu_benchmark_base.hpp>
 
 #include <complex>
 #include <vector>

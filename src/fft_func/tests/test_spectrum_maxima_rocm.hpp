@@ -28,8 +28,8 @@
 #endif
 
 #if ENABLE_ROCM
-#include "processors/spectrum_processor_rocm.hpp"
-#include "factory/spectrum_processor_factory.hpp"
+#include <spectrum/processors/spectrum_processor_rocm.hpp>
+#include <spectrum/factory/spectrum_processor_factory.hpp>
 #include "backends/rocm/rocm_backend.hpp"
 #include "common/backend_type.hpp"
 

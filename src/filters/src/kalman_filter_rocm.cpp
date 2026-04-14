@@ -8,9 +8,9 @@
 
 #if ENABLE_ROCM
 
-#include "filters/kalman_filter_rocm.hpp"
+#include <spectrum/filters/kalman_filter_rocm.hpp>
 #include "kernels/kalman_kernels_rocm.hpp"
-#include "services/console_output.hpp"
+#include <core/services/console_output.hpp>
 
 #include <stdexcept>
 #include <cstring>

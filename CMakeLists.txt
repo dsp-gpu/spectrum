@@ -37,20 +37,23 @@ target_sources(DspSpectrum PRIVATE
 
 target_include_directories(DspSpectrum
   PUBLIC
+    # Стандарт AMD: #include <spectrum/operations/...>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
     $<INSTALL_INTERFACE:include>
   PRIVATE
-    # Внутренние include каждого субмодуля
-    src/fft_func/include
-    src/filters/include
-    src/lch_farrow/include
     # Kernels — hiprtc runtime, не компилируем, но include нужен
     kernels/
     src
 )
 target_link_libraries(DspSpectrum PUBLIC DspCore::DspCore hip::hipfft)
 target_compile_features(DspSpectrum PUBLIC cxx_std_17)
+
+# Прокинуть ENABLE_ROCM=1 — нужно для #if ENABLE_ROCM блоков в коде.
+# PUBLIC чтобы клиенты (downstream модули) тоже видели.
+if(ENABLE_ROCM)
+  target_compile_definitions(DspSpectrum PUBLIC ENABLE_ROCM=1)
+endif()
 
 # ── Git Version ────────────────────────────────────────────────────
 find_package(Git QUIET)

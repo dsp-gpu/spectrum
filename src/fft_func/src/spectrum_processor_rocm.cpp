@@ -27,15 +27,15 @@
 
 #if ENABLE_ROCM
 
-#include "processors/spectrum_processor_rocm.hpp"
+#include <spectrum/processors/spectrum_processor_rocm.hpp>
 #include "kernels/fft_kernel_sources_rocm.hpp"
 #include "kernels/all_maxima_kernel_sources_rocm.hpp"
 #include "rocm_profiling_helpers.hpp"
-#include "services/console_output.hpp"
-#include "services/gpu_profiler.hpp"
-#include "services/batch_manager.hpp"
-#include "interface/i_backend.hpp"
-#include "services/profiling_types.hpp"
+#include <core/services/console_output.hpp>
+#include <core/services/gpu_profiler.hpp>
+#include <core/services/batch_manager.hpp>
+#include <core/interface/i_backend.hpp>
+#include <core/services/profiling_types.hpp>
 
 #include <stdexcept>
 #include <cstring>
@@ -1360,7 +1360,7 @@ ProfilingData SpectrumProcessorROCm::GetProfilingData() const {
 // Stub implementation for non-ROCm builds (Windows)
 // ════════════════════════════════════════════════════════════════════════════
 
-#include "processors/spectrum_processor_rocm.hpp"
+#include <spectrum/processors/spectrum_processor_rocm.hpp>
 #include <stdexcept>
 
 namespace antenna_fft {

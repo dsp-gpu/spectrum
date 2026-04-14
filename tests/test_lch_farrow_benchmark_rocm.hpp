@@ -26,8 +26,8 @@
 #if ENABLE_ROCM
 
 #include "lch_farrow_benchmark_rocm.hpp"
-#include "backends/rocm/rocm_backend.hpp"
-#include "backends/rocm/rocm_core.hpp"
+#include <core/backends/rocm/rocm_backend.hpp>
+#include <core/backends/rocm/rocm_core.hpp>
 
 #include <iostream>
 #include <complex>

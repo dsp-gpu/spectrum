@@ -15,8 +15,8 @@
 
 #include "complex_to_mag_phase_rocm.hpp"
 #include "kernels/complex_to_mag_phase_kernels_rocm.hpp"
-#include "services/console_output.hpp"
-#include "logger/logger.hpp"
+#include <core/services/console_output.hpp>
+#include <core/logger/logger.hpp>
 
 #include <stdexcept>
 #include <cstring>

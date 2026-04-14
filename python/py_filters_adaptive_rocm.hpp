@@ -23,9 +23,9 @@
  * @date 2026-03-10
  */
 
-#include "filters/moving_average_filter_rocm.hpp"
-#include "filters/kalman_filter_rocm.hpp"
-#include "filters/kaufman_filter_rocm.hpp"
+#include <spectrum/filters/moving_average_filter_rocm.hpp>
+#include <spectrum/filters/kalman_filter_rocm.hpp>
+#include <spectrum/filters/kaufman_filter_rocm.hpp>
 
 // ============================================================================
 // Helper: parse input numpy array → (channels, points)

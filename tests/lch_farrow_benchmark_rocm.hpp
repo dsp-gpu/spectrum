@@ -22,8 +22,8 @@
 
 #if ENABLE_ROCM
 
-#include "lch_farrow_rocm.hpp"
-#include "DrvGPU/services/gpu_benchmark_base.hpp"
+#include <spectrum/lch_farrow_rocm.hpp>
+#include <core/services/gpu_benchmark_base.hpp>
 
 #include <hip/hip_runtime.h>
 #include <vector>

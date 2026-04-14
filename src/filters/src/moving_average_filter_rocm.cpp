@@ -8,9 +8,9 @@
 
 #if ENABLE_ROCM
 
-#include "filters/moving_average_filter_rocm.hpp"
+#include <spectrum/filters/moving_average_filter_rocm.hpp>
 #include "kernels/moving_average_kernels_rocm.hpp"
-#include "services/console_output.hpp"
+#include <core/services/console_output.hpp>
 
 #include <stdexcept>
 #include <cstring>

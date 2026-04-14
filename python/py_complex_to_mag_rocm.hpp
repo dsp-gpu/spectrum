@@ -22,8 +22,8 @@
  * @date 2026-03-11
  */
 
-#include "complex_to_mag_phase_rocm.hpp"
-#include "types/mag_phase_types.hpp"
+#include <spectrum/complex_to_mag_phase_rocm.hpp>
+#include <spectrum/types/mag_phase_types.hpp>
 
 // ============================================================================
 // PyComplexToMagROCm — magnitude-only conversion (GPU, ROCm)

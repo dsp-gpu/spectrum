@@ -28,8 +28,8 @@
 #include "lch_farrow_rocm.hpp"
 #include "kernels/lch_farrow_kernels_rocm.hpp"
 #include "rocm_profiling_helpers.hpp"
-#include "services/console_output.hpp"
-#include "services/profiling_types.hpp"
+#include <core/services/console_output.hpp>
+#include <core/services/profiling_types.hpp>
 
 #include <stdexcept>
 #include <cmath>

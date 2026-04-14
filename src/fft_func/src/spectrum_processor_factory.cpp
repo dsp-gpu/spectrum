@@ -3,8 +3,8 @@
  * @brief Factory implementation for ISpectrumProcessor — ветка main (ROCm only)
  */
 
-#include "factory/spectrum_processor_factory.hpp"
-#include "processors/spectrum_processor_rocm.hpp"
+#include <spectrum/factory/spectrum_processor_factory.hpp>
+#include <spectrum/processors/spectrum_processor_rocm.hpp>
 
 #include <stdexcept>
 

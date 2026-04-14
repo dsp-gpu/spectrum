@@ -24,7 +24,7 @@
  * @date 2026-03-10
  */
 
-#include "processors/spectrum_processor_rocm.hpp"
+#include <spectrum/processors/spectrum_processor_rocm.hpp>
 
 // ============================================================================
 // PySpectrumMaximaFinderROCm — ROCm wrapper

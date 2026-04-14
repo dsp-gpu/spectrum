@@ -17,10 +17,10 @@
 #include "fft_processor_rocm.hpp"
 #include "kernels/fft_processor_kernels_rocm.hpp"
 #include "rocm_profiling_helpers.hpp"
-#include "services/gpu_profiler.hpp"
-#include "config/gpu_config.hpp"
-#include "logger/logger.hpp"
-#include "services/console_output.hpp"
+#include <core/services/gpu_profiler.hpp>
+#include <core/config/gpu_config.hpp>
+#include <core/logger/logger.hpp>
+#include <core/services/console_output.hpp>
 
 #include <stdexcept>
 #include <cstring>

@@ -11,12 +11,12 @@
 
 #if ENABLE_ROCM
 
-#include "pipelines/all_maxima_pipeline_rocm.hpp"
+#include <spectrum/pipelines/all_maxima_pipeline_rocm.hpp>
 #include "kernels/all_maxima_kernel_sources_rocm.hpp"
-#include "services/console_output.hpp"
-#include "services/gpu_profiler.hpp"
-#include "services/kernel_cache_service.hpp"
-#include "backends/rocm/rocm_backend.hpp"
+#include <core/services/console_output.hpp>
+#include <core/services/gpu_profiler.hpp>
+#include <core/services/kernel_cache_service.hpp>
+#include <core/backends/rocm/rocm_backend.hpp>
 
 #include <cstring>
 #include <stdexcept>

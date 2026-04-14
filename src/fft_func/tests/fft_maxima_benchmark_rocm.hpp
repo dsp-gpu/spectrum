@@ -19,7 +19,7 @@
 
 #if ENABLE_ROCM
 
-#include "processors/spectrum_processor_rocm.hpp"
+#include <spectrum/processors/spectrum_processor_rocm.hpp>
 #include "DrvGPU/services/gpu_benchmark_base.hpp"
 
 #include <complex>

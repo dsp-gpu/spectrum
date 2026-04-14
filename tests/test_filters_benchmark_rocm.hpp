@@ -20,8 +20,8 @@
 
 #include "filters_benchmark_rocm.hpp"
 #include "test_fir_basic.hpp"   // kTestFirCoeffs64
-#include "DrvGPU/backends/rocm/rocm_backend.hpp"
-#include "DrvGPU/backends/rocm/rocm_core.hpp"
+#include <core/backends/rocm/rocm_backend.hpp>
+#include <core/backends/rocm/rocm_core.hpp>
 
 #include <complex>
 #include <vector>

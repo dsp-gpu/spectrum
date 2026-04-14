@@ -29,9 +29,9 @@
 #endif
 
 #if ENABLE_ROCM
-#include "lch_farrow_rocm.hpp"
-#include "backends/rocm/rocm_backend.hpp"
-#include "services/console_output.hpp"
+#include <spectrum/lch_farrow_rocm.hpp>
+#include <core/backends/rocm/rocm_backend.hpp>
+#include <core/services/console_output.hpp>
 #endif
 
 namespace test_lch_farrow_rocm {

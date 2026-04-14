@@ -33,9 +33,9 @@
 
 #if ENABLE_ROCM
 
-#include "filters/moving_average_filter_rocm.hpp"
-#include "backends/rocm/rocm_backend.hpp"
-#include "backends/rocm/rocm_core.hpp"
+#include <spectrum/filters/moving_average_filter_rocm.hpp>
+#include <core/backends/rocm/rocm_backend.hpp>
+#include <core/backends/rocm/rocm_core.hpp>
 
 // test_utils — unified test infrastructure
 #include "modules/test_utils/test_utils.hpp"

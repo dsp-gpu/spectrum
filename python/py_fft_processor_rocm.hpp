@@ -16,7 +16,7 @@
  * @date 2026-03-10
  */
 
-#include "fft_processor_rocm.hpp"
+#include <spectrum/fft_processor_rocm.hpp>
 
 // ============================================================================
 // PyFFTProcessorROCm — pythonic wrapper over fft_processor::FFTProcessorROCm
