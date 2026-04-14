@@ -30,7 +30,7 @@
 #include <spectrum/processors/spectrum_processor_rocm.hpp>
 #include "kernels/fft_kernel_sources_rocm.hpp"
 #include "kernels/all_maxima_kernel_sources_rocm.hpp"
-#include "rocm_profiling_helpers.hpp"
+#include <spectrum/utils/rocm_profiling_helpers.hpp>
 #include <core/services/console_output.hpp>
 #include <core/services/gpu_profiler.hpp>
 #include <core/services/batch_manager.hpp>

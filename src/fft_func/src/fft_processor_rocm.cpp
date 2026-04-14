@@ -16,7 +16,8 @@
 
 #include "fft_processor_rocm.hpp"
 #include "kernels/fft_processor_kernels_rocm.hpp"
-#include "rocm_profiling_helpers.hpp"
+#include <spectrum/utils/rocm_profiling_helpers.hpp>
+#include <spectrum/utils/scoped_hip_event.hpp>
 #include <core/services/gpu_profiler.hpp>
 #include <core/config/gpu_config.hpp>
 #include <core/logger/logger.hpp>
@@ -201,9 +202,11 @@ void FFTProcessorROCm::ReleasePlans() {
 // =========================================================================
 
 void FFTProcessorROCm::UploadData(const std::complex<float>* data, size_t count) {
+  // hipMemcpyHtoDAsync не меняет src — const_cast был вынужденным для старого API.
+  // В HIP 5+ сигнатура принимает const void* через неявное приведение.
   hipError_t err = hipMemcpyHtoDAsync(
       bufs_.Get(kInputBuf),
-      const_cast<std::complex<float>*>(data),
+      static_cast<void*>(const_cast<std::complex<float>*>(data)),
       count * sizeof(std::complex<float>), ctx_.stream());
   if (err != hipSuccess) {
     throw std::runtime_error("UploadData: " + std::string(hipGetErrorString(err)));
@@ -229,11 +232,16 @@ std::vector<FFTComplexResult> FFTProcessorROCm::ReadComplexResults(
   size_t total = beam_count * nFFT_;
   std::vector<std::complex<float>> raw(total);
 
-  hipError_t err = hipMemcpyDtoH(raw.data(), bufs_.Get(kFftBuf),
-                                   total * sizeof(std::complex<float>));
+  // Async DtoH на рабочем stream + explicit sync.
+  // Раньше был blocking hipMemcpyDtoH — он неявно синхронизировал весь stream,
+  // ломая профилирование (время копии включало ожидание предыдущих kernel'ов).
+  hipError_t err = hipMemcpyDtoHAsync(raw.data(), bufs_.Get(kFftBuf),
+                                        total * sizeof(std::complex<float>),
+                                        ctx_.stream());
   if (err != hipSuccess) {
     throw std::runtime_error("ReadComplexResults: " + std::string(hipGetErrorString(err)));
   }
+  hipStreamSynchronize(ctx_.stream());
 
   std::vector<FFTComplexResult> results;
   results.reserve(beam_count);
@@ -253,11 +261,14 @@ std::vector<FFTMagPhaseResult> FFTProcessorROCm::ReadMagPhaseResults(
   size_t total = beam_count * nFFT_;
   std::vector<float> raw(total * 2);
 
-  hipError_t err = hipMemcpyDtoH(raw.data(), bufs_.Get(kMagPhaseInterleaved),
-                                   total * 2 * sizeof(float));
+  // Async DtoH на рабочем stream + explicit sync (см. ReadComplexResults).
+  hipError_t err = hipMemcpyDtoHAsync(raw.data(), bufs_.Get(kMagPhaseInterleaved),
+                                        total * 2 * sizeof(float),
+                                        ctx_.stream());
   if (err != hipSuccess) {
     throw std::runtime_error("ReadMagPhaseResults: " + std::string(hipGetErrorString(err)));
   }
+  hipStreamSynchronize(ctx_.stream());
 
   std::vector<FFTMagPhaseResult> results;
   results.reserve(beam_count);
@@ -319,26 +330,26 @@ std::vector<FFTComplexResult> FFTProcessorROCm::ProcessComplex(
     AllocateBuffers(batch.count, FFTOutputMode::COMPLEX);
     CreateFFTPlan(batch.count);
 
-    hipEvent_t ev_up_s = nullptr, ev_up_e = nullptr;
-    hipEvent_t ev_pad_s = nullptr, ev_pad_e = nullptr;
-    hipEvent_t ev_fft_s = nullptr, ev_fft_e = nullptr;
+    // RAII-события: если что-то бросит между Create и конечным использованием,
+    // ScopedHipEvent::~ScopedHipEvent гарантированно вызовет hipEventDestroy.
+    ScopedHipEvent ev_up_s, ev_up_e, ev_pad_s, ev_pad_e, ev_fft_s, ev_fft_e;
     if (prof_events) {
-      hipEventCreate(&ev_up_s); hipEventCreate(&ev_up_e);
-      hipEventCreate(&ev_pad_s); hipEventCreate(&ev_pad_e);
-      hipEventCreate(&ev_fft_s); hipEventCreate(&ev_fft_e);
+      ev_up_s.Create(); ev_up_e.Create();
+      ev_pad_s.Create(); ev_pad_e.Create();
+      ev_fft_s.Create(); ev_fft_e.Create();
     }
 
     const auto* batch_data = data.data() + batch.start * params.n_point;
-    if (prof_events) hipEventRecord(ev_up_s, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_up_s.get(), ctx_.stream());
     UploadData(batch_data, batch.count * params.n_point);
-    if (prof_events) hipEventRecord(ev_up_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_up_e.get(), ctx_.stream());
 
-    if (prof_events) hipEventRecord(ev_pad_s, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_pad_s.get(), ctx_.stream());
     pad_op_.Execute(bufs_.Get(kInputBuf), bufs_.Get(kFftBuf),
                     batch.count, n_point_, nFFT_);
-    if (prof_events) hipEventRecord(ev_pad_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_pad_e.get(), ctx_.stream());
 
-    if (prof_events) hipEventRecord(ev_fft_s, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_fft_s.get(), ctx_.stream());
     hipfftResult fft_result = hipfftExecC2C(
         plan_,
         static_cast<hipfftComplex*>(bufs_.Get(kFftBuf)),
@@ -348,14 +359,14 @@ std::vector<FFTComplexResult> FFTProcessorROCm::ProcessComplex(
       throw std::runtime_error("hipfftExecC2C failed: " +
                                 std::to_string(static_cast<int>(fft_result)));
     }
-    if (prof_events) hipEventRecord(ev_fft_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_fft_e.get(), ctx_.stream());
 
     hipStreamSynchronize(ctx_.stream());
 
     if (prof_events) {
-      prof_events->push_back({"Upload", MakeROCmDataFromEvents(ev_up_s, ev_up_e, 1, "H2D copy")});
-      prof_events->push_back({"Pad", MakeROCmDataFromEvents(ev_pad_s, ev_pad_e, 0, "pad kernel")});
-      prof_events->push_back({"FFT", MakeROCmDataFromEvents(ev_fft_s, ev_fft_e, 0, "hipfftExecC2C")});
+      prof_events->push_back({"Upload", MakeROCmDataFromEvents(ev_up_s.get(), ev_up_e.get(), 1, "H2D copy")});
+      prof_events->push_back({"Pad", MakeROCmDataFromEvents(ev_pad_s.get(), ev_pad_e.get(), 0, "pad kernel")});
+      prof_events->push_back({"FFT", MakeROCmDataFromEvents(ev_fft_s.get(), ev_fft_e.get(), 0, "hipfftExecC2C")});
     }
 
     auto t_dl_start = std::chrono::high_resolution_clock::now();
@@ -449,28 +460,27 @@ std::vector<FFTMagPhaseResult> FFTProcessorROCm::ProcessMagPhase(
     AllocateBuffers(batch.count, params.output_mode);
     CreateFFTPlan(batch.count);
 
-    hipEvent_t ev_up_s = nullptr, ev_up_e = nullptr;
-    hipEvent_t ev_pad_s = nullptr, ev_pad_e = nullptr;
-    hipEvent_t ev_fft_s = nullptr, ev_fft_e = nullptr;
-    hipEvent_t ev_mag_s = nullptr, ev_mag_e = nullptr;
+    // RAII-события (см. ProcessComplex).
+    ScopedHipEvent ev_up_s, ev_up_e, ev_pad_s, ev_pad_e,
+                   ev_fft_s, ev_fft_e, ev_mag_s, ev_mag_e;
     if (prof_events) {
-      hipEventCreate(&ev_up_s); hipEventCreate(&ev_up_e);
-      hipEventCreate(&ev_pad_s); hipEventCreate(&ev_pad_e);
-      hipEventCreate(&ev_fft_s); hipEventCreate(&ev_fft_e);
-      hipEventCreate(&ev_mag_s); hipEventCreate(&ev_mag_e);
+      ev_up_s.Create(); ev_up_e.Create();
+      ev_pad_s.Create(); ev_pad_e.Create();
+      ev_fft_s.Create(); ev_fft_e.Create();
+      ev_mag_s.Create(); ev_mag_e.Create();
     }
 
     const auto* batch_data = data.data() + batch.start * params.n_point;
-    if (prof_events) hipEventRecord(ev_up_s, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_up_s.get(), ctx_.stream());
     UploadData(batch_data, batch.count * params.n_point);
-    if (prof_events) hipEventRecord(ev_up_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_up_e.get(), ctx_.stream());
 
-    if (prof_events) hipEventRecord(ev_pad_s, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_pad_s.get(), ctx_.stream());
     pad_op_.Execute(bufs_.Get(kInputBuf), bufs_.Get(kFftBuf),
                     batch.count, n_point_, nFFT_);
-    if (prof_events) hipEventRecord(ev_pad_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_pad_e.get(), ctx_.stream());
 
-    if (prof_events) hipEventRecord(ev_fft_s, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_fft_s.get(), ctx_.stream());
     hipfftResult fft_res_mp = hipfftExecC2C(plan_,
                   static_cast<hipfftComplex*>(bufs_.Get(kFftBuf)),
                   static_cast<hipfftComplex*>(bufs_.Get(kFftBuf)),
@@ -479,20 +489,20 @@ std::vector<FFTMagPhaseResult> FFTProcessorROCm::ProcessMagPhase(
       throw std::runtime_error("ProcessMagPhase: hipfftExecC2C failed: " +
                                 std::to_string(static_cast<int>(fft_res_mp)));
     }
-    if (prof_events) hipEventRecord(ev_fft_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_fft_e.get(), ctx_.stream());
 
-    if (prof_events) hipEventRecord(ev_mag_s, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_mag_s.get(), ctx_.stream());
     mag_phase_op_.Execute(bufs_.Get(kFftBuf), bufs_.Get(kMagPhaseInterleaved),
                           batch.count * nFFT_);
-    if (prof_events) hipEventRecord(ev_mag_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_mag_e.get(), ctx_.stream());
 
     hipStreamSynchronize(ctx_.stream());
 
     if (prof_events) {
-      prof_events->push_back({"Upload", MakeROCmDataFromEvents(ev_up_s, ev_up_e, 1, "H2D copy")});
-      prof_events->push_back({"Pad", MakeROCmDataFromEvents(ev_pad_s, ev_pad_e, 0, "pad kernel")});
-      prof_events->push_back({"FFT", MakeROCmDataFromEvents(ev_fft_s, ev_fft_e, 0, "hipfftExecC2C")});
-      prof_events->push_back({"MagPhase", MakeROCmDataFromEvents(ev_mag_s, ev_mag_e, 0, "mag_phase kernel")});
+      prof_events->push_back({"Upload", MakeROCmDataFromEvents(ev_up_s.get(), ev_up_e.get(), 1, "H2D copy")});
+      prof_events->push_back({"Pad", MakeROCmDataFromEvents(ev_pad_s.get(), ev_pad_e.get(), 0, "pad kernel")});
+      prof_events->push_back({"FFT", MakeROCmDataFromEvents(ev_fft_s.get(), ev_fft_e.get(), 0, "hipfftExecC2C")});
+      prof_events->push_back({"MagPhase", MakeROCmDataFromEvents(ev_mag_s.get(), ev_mag_e.get(), 0, "mag_phase kernel")});
     }
 
     auto t_dl_start = std::chrono::high_resolution_clock::now();
@@ -596,25 +606,24 @@ void FFTProcessorROCm::ProcessMagnitudesToGPU(
   CopyGpuData(gpu_data, 0,
               static_cast<size_t>(params.beam_count) * params.n_point);
 
-  // Optional profiling events
-  hipEvent_t ev_pad_s = nullptr, ev_pad_e = nullptr;
-  hipEvent_t ev_fft_s = nullptr, ev_fft_e = nullptr;
-  hipEvent_t ev_mag_s = nullptr, ev_mag_e = nullptr;
+  // RAII-события: раньше этот блок явно не вызывал hipEventDestroy —
+  // события утекали даже при нормальном завершении (!).
+  ScopedHipEvent ev_pad_s, ev_pad_e, ev_fft_s, ev_fft_e, ev_mag_s, ev_mag_e;
   if (prof_events) {
-    hipEventCreate(&ev_pad_s); hipEventCreate(&ev_pad_e);
-    hipEventCreate(&ev_fft_s); hipEventCreate(&ev_fft_e);
-    hipEventCreate(&ev_mag_s); hipEventCreate(&ev_mag_e);
+    ev_pad_s.Create(); ev_pad_e.Create();
+    ev_fft_s.Create(); ev_fft_e.Create();
+    ev_mag_s.Create(); ev_mag_e.Create();
   }
 
   // 5. Pad (+ optional window) → kFftBuf
-  if (prof_events) hipEventRecord(ev_pad_s, ctx_.stream());
+  if (prof_events) hipEventRecord(ev_pad_s.get(), ctx_.stream());
   pad_op_.Execute(bufs_.Get(kInputBuf), bufs_.Get(kFftBuf),
                   params.beam_count, n_point_, nFFT_,
                   window);  // SNR_02b: window function (default None)
-  if (prof_events) hipEventRecord(ev_pad_e, ctx_.stream());
+  if (prof_events) hipEventRecord(ev_pad_e.get(), ctx_.stream());
 
   // 6. FFT in-place in kFftBuf
-  if (prof_events) hipEventRecord(ev_fft_s, ctx_.stream());
+  if (prof_events) hipEventRecord(ev_fft_s.get(), ctx_.stream());
   hipfftResult fft_err = hipfftExecC2C(
       plan_,
       static_cast<hipfftComplex*>(bufs_.Get(kFftBuf)),
@@ -624,26 +633,26 @@ void FFTProcessorROCm::ProcessMagnitudesToGPU(
     throw std::runtime_error("ProcessMagnitudesToGPU: hipfftExecC2C failed: " +
                               std::to_string(static_cast<int>(fft_err)));
   }
-  if (prof_events) hipEventRecord(ev_fft_e, ctx_.stream());
+  if (prof_events) hipEventRecord(ev_fft_e.get(), ctx_.stream());
 
   // 7. Magnitude (|X| или |X|²) → caller-provided gpu_out_magnitudes
   //    inv_n = 1.0f: raw output, caller сам нормирует если нужно.
   //    Для CFAR SNR-estimator нормировка не нужна — ratio сокращает её.
   size_t total = static_cast<size_t>(params.beam_count) * nFFT_;
-  if (prof_events) hipEventRecord(ev_mag_s, ctx_.stream());
+  if (prof_events) hipEventRecord(ev_mag_s.get(), ctx_.stream());
   mag_op_.Execute(bufs_.Get(kFftBuf), gpu_out_magnitudes,
                   total, 1.0f, squared);
-  if (prof_events) hipEventRecord(ev_mag_e, ctx_.stream());
+  if (prof_events) hipEventRecord(ev_mag_e.get(), ctx_.stream());
 
   hipStreamSynchronize(ctx_.stream());
 
   if (prof_events) {
     prof_events->push_back({"Pad",
-        MakeROCmDataFromEvents(ev_pad_s, ev_pad_e, 0, "pad (+window)")});
+        MakeROCmDataFromEvents(ev_pad_s.get(), ev_pad_e.get(), 0, "pad (+window)")});
     prof_events->push_back({"FFT",
-        MakeROCmDataFromEvents(ev_fft_s, ev_fft_e, 0, "hipfftExecC2C")});
+        MakeROCmDataFromEvents(ev_fft_s.get(), ev_fft_e.get(), 0, "hipfftExecC2C")});
     prof_events->push_back({"Magnitude",
-        MakeROCmDataFromEvents(ev_mag_s, ev_mag_e, 0,
+        MakeROCmDataFromEvents(ev_mag_s.get(), ev_mag_e.get(), 0,
                                squared ? "complex_to_magnitude_squared"
                                        : "complex_to_magnitude")});
   }

@@ -11,8 +11,8 @@
  * @date 2026-02-15
  */
 
-#include "spectrum_maxima_types.h"
-#include "spectrum_input_data.hpp"
+#include <spectrum/interface/spectrum_maxima_types.h>
+#include <spectrum/interface/spectrum_input_data.hpp>
 
 #include <vector>
 #include <complex>
