@@ -20,15 +20,18 @@
 
 namespace fft_func_utils {
 
-/// Convert hipEvent pair → ROCmProfilingData. Destroys both events after measurement.
+/// Convert hipEvent pair → ROCmProfilingData.
+///
+/// @note Read-only: НЕ вызывает hipEventDestroy.
+///       Владение событиями остаётся за вызывающим (обычно ScopedHipEvent).
+///       Раньше делался destroy — приводило к double-free с RAII-клиентами.
+///       2026-04-15: destroy убран, все клиенты используют ScopedHipEvent.
 inline drv_gpu_lib::ROCmProfilingData MakeROCmDataFromEvents(
     hipEvent_t ev_start, hipEvent_t ev_end,
     uint32_t kind, const char* op_string = "") {
   hipEventSynchronize(ev_end);
   float elapsed_ms = 0.0f;
   hipEventElapsedTime(&elapsed_ms, ev_start, ev_end);
-  hipEventDestroy(ev_start);
-  hipEventDestroy(ev_end);
 
   drv_gpu_lib::ROCmProfilingData d{};
   uint64_t elapsed_ns = static_cast<uint64_t>(elapsed_ms * 1e6f);

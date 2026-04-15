@@ -28,6 +28,7 @@
 #include "lch_farrow_rocm.hpp"
 #include "kernels/lch_farrow_kernels_rocm.hpp"
 #include <spectrum/utils/rocm_profiling_helpers.hpp>
+#include <core/services/scoped_hip_event.hpp>
 #include <core/services/console_output.hpp>
 #include <core/services/profiling_types.hpp>
 
@@ -285,6 +286,7 @@ void LchFarrowROCm::LoadMatrix(const std::string& json_path) {
 
 using fft_func_utils::MakeROCmDataFromEvents;
 using fft_func_utils::MakeROCmDataFromClock;
+using drv_gpu_lib::ScopedHipEvent;
 
 drv_gpu_lib::InputData<void*>
 LchFarrowROCm::Process(void* input_ptr, uint32_t antennas, uint32_t points,
@@ -339,23 +341,23 @@ LchFarrowROCm::Process(void* input_ptr, uint32_t antennas, uint32_t points,
   }
 
   // ── Upload_delay (async) ─────────────────────────────────────────
-  hipEvent_t ev_up_start = nullptr, ev_up_end = nullptr;
+  // RAII: события освободятся автоматически даже при throw ниже.
+  ScopedHipEvent ev_up_start, ev_up_end;
   if (prof_events) {
-    hipEventCreate(&ev_up_start);
-    hipEventCreate(&ev_up_end);
-    hipEventRecord(ev_up_start, ctx_.stream());
+    ev_up_start.Create();
+    ev_up_end.Create();
+    hipEventRecord(ev_up_start.get(), ctx_.stream());
   }
 
   err = hipMemcpyHtoDAsync(delay_buf_, delay_us_.data(), delay_size, ctx_.stream());
   if (err != hipSuccess) {
-    if (ev_up_start) { hipEventDestroy(ev_up_start); hipEventDestroy(ev_up_end); }
     (void)hipFree(output_ptr);
     throw std::runtime_error(
         "LchFarrowROCm::Process: hipMemcpyHtoDAsync(delay) failed");
   }
 
   if (prof_events) {
-    hipEventRecord(ev_up_end, ctx_.stream());
+    hipEventRecord(ev_up_end.get(), ctx_.stream());
   }
 
   // ── Kernel arguments ──────────────────────────────────────────────
@@ -385,11 +387,11 @@ LchFarrowROCm::Process(void* input_ptr, uint32_t antennas, uint32_t points,
   };
 
   // ── Kernel (async) ────────────────────────────────────────────────
-  hipEvent_t ev_k_start = nullptr, ev_k_end = nullptr;
+  ScopedHipEvent ev_k_start, ev_k_end;
   if (prof_events) {
-    hipEventCreate(&ev_k_start);
-    hipEventCreate(&ev_k_end);
-    hipEventRecord(ev_k_start, ctx_.stream());
+    ev_k_start.Create();
+    ev_k_end.Create();
+    hipEventRecord(ev_k_start.get(), ctx_.stream());
   }
 
   // 2D grid: X=samples (ceil), Y=antennas — eliminates div/mod in kernel
@@ -405,17 +407,16 @@ LchFarrowROCm::Process(void* input_ptr, uint32_t antennas, uint32_t points,
       args, nullptr);
 
   if (err != hipSuccess) {
-    if (ev_up_start) { hipEventDestroy(ev_up_start); hipEventDestroy(ev_up_end); }
-    if (ev_k_start)  { hipEventDestroy(ev_k_start);  hipEventDestroy(ev_k_end);  }
     (void)hipFree(output_ptr);
     // delay_buf_ — persistent буфер, не освобождаем здесь (живёт между вызовами Process)
+    // События освобождаются в ~ScopedHipEvent автоматически при throw.
     throw std::runtime_error(
         "LchFarrowROCm::Process: hipModuleLaunchKernel failed: " +
         std::string(hipGetErrorString(err)));
   }
 
   if (prof_events) {
-    hipEventRecord(ev_k_end, ctx_.stream());
+    hipEventRecord(ev_k_end.get(), ctx_.stream());
   }
 
   (void)hipStreamSynchronize(ctx_.stream());
@@ -425,9 +426,9 @@ LchFarrowROCm::Process(void* input_ptr, uint32_t antennas, uint32_t points,
   // ── Собрать prof_events (stream синхронизирован — данные готовы) ──
   if (prof_events) {
     prof_events->push_back({"Upload_delay",
-        MakeROCmDataFromEvents(ev_up_start, ev_up_end, 1, "H2D_delay")});
+        MakeROCmDataFromEvents(ev_up_start.get(), ev_up_end.get(), 1, "H2D_delay")});
     prof_events->push_back({"Kernel",
-        MakeROCmDataFromEvents(ev_k_start, ev_k_end, 0, "lch_farrow_delay")});
+        MakeROCmDataFromEvents(ev_k_start.get(), ev_k_end.get(), 0, "lch_farrow_delay")});
   }
 
   drv_gpu_lib::InputData<void*> result;
@@ -463,25 +464,24 @@ LchFarrowROCm::ProcessFromCPU(
   }
 
   // ── Upload_input (async) ─────────────────────────────────────────
-  hipEvent_t ev_in_start = nullptr, ev_in_end = nullptr;
+  ScopedHipEvent ev_in_start, ev_in_end;
   if (prof_events) {
-    hipEventCreate(&ev_in_start);
-    hipEventCreate(&ev_in_end);
-    hipEventRecord(ev_in_start, ctx_.stream());
+    ev_in_start.Create();
+    ev_in_end.Create();
+    hipEventRecord(ev_in_start.get(), ctx_.stream());
   }
 
   err = hipMemcpyHtoDAsync(input_ptr,
                             const_cast<std::complex<float>*>(data.data()),
                             data_size, ctx_.stream());
   if (err != hipSuccess) {
-    if (ev_in_start) { hipEventDestroy(ev_in_start); hipEventDestroy(ev_in_end); }
     (void)hipFree(input_ptr);
     throw std::runtime_error(
         "LchFarrowROCm::ProcessFromCPU: hipMemcpyHtoDAsync(input) failed");
   }
 
   if (prof_events) {
-    hipEventRecord(ev_in_end, ctx_.stream());
+    hipEventRecord(ev_in_end.get(), ctx_.stream());
   }
 
   // Process on GPU (Upload_delay + Kernel — добавляются в prof_events через Process)
@@ -491,7 +491,7 @@ LchFarrowROCm::ProcessFromCPU(
   // ── Собрать Upload_input (stream уже синхронизирован Process'ом) ──
   if (prof_events) {
     prof_events->push_back({"Upload_input",
-        MakeROCmDataFromEvents(ev_in_start, ev_in_end, 1, "H2D_input")});
+        MakeROCmDataFromEvents(ev_in_start.get(), ev_in_end.get(), 1, "H2D_input")});
   }
 
   // Free the temporary input buffer

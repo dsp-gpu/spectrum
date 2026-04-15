@@ -31,6 +31,7 @@
 #include "kernels/fft_kernel_sources_rocm.hpp"
 #include "kernels/all_maxima_kernel_sources_rocm.hpp"
 #include <spectrum/utils/rocm_profiling_helpers.hpp>
+#include <core/services/scoped_hip_event.hpp>
 #include <core/services/console_output.hpp>
 #include <core/services/gpu_profiler.hpp>
 #include <core/services/batch_manager.hpp>
@@ -45,6 +46,7 @@
 
 using fft_func_utils::MakeROCmDataFromEvents;
 using fft_func_utils::MakeROCmDataFromClock;
+using drv_gpu_lib::ScopedHipEvent;
 
 namespace antenna_fft {
 
@@ -190,40 +192,40 @@ std::vector<SpectrumResult> SpectrumProcessorROCm::ProcessBatch(
     size_t count  = batch_antenna_count * params_.n_point;
 
     // ── Upload (H2D) ─────────────────────────────────────────────────────────
-    hipEvent_t ev_up_s = nullptr, ev_up_e = nullptr;
+    ScopedHipEvent ev_up_s, ev_up_e;
     if (prof_events) {
-        hipEventCreate(&ev_up_s); hipEventCreate(&ev_up_e);
-        hipEventRecord(ev_up_s, ctx_.stream());
+        ev_up_s.Create(); ev_up_e.Create();
+        hipEventRecord(ev_up_s.get(), ctx_.stream());
     }
     UploadData(input_data.data() + offset, count);
-    if (prof_events) hipEventRecord(ev_up_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_up_e.get(), ctx_.stream());
 
     // ── PadKernel ────────────────────────────────────────────────────────────
-    hipEvent_t ev_pad_s = nullptr, ev_pad_e = nullptr;
+    ScopedHipEvent ev_pad_s, ev_pad_e;
     if (prof_events) {
-        hipEventCreate(&ev_pad_s); hipEventCreate(&ev_pad_e);
-        hipEventRecord(ev_pad_s, ctx_.stream());
+        ev_pad_s.Create(); ev_pad_e.Create();
+        hipEventRecord(ev_pad_s.get(), ctx_.stream());
     }
     ExecutePadKernel(batch_antenna_count);
-    if (prof_events) hipEventRecord(ev_pad_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_pad_e.get(), ctx_.stream());
 
     // ── FFT ──────────────────────────────────────────────────────────────────
-    hipEvent_t ev_fft_s = nullptr, ev_fft_e = nullptr;
+    ScopedHipEvent ev_fft_s, ev_fft_e;
     if (prof_events) {
-        hipEventCreate(&ev_fft_s); hipEventCreate(&ev_fft_e);
-        hipEventRecord(ev_fft_s, ctx_.stream());
+        ev_fft_s.Create(); ev_fft_e.Create();
+        hipEventRecord(ev_fft_s.get(), ctx_.stream());
     }
     ExecuteFFT();
-    if (prof_events) hipEventRecord(ev_fft_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_fft_e.get(), ctx_.stream());
 
     // ── PostKernel ───────────────────────────────────────────────────────────
-    hipEvent_t ev_post_s = nullptr, ev_post_e = nullptr;
+    ScopedHipEvent ev_post_s, ev_post_e;
     if (prof_events) {
-        hipEventCreate(&ev_post_s); hipEventCreate(&ev_post_e);
-        hipEventRecord(ev_post_s, ctx_.stream());
+        ev_post_s.Create(); ev_post_e.Create();
+        hipEventRecord(ev_post_s.get(), ctx_.stream());
     }
     ExecutePostKernel(batch_antenna_count);
-    if (prof_events) hipEventRecord(ev_post_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_post_e.get(), ctx_.stream());
 
     hipStreamSynchronize(ctx_.stream());
 
@@ -234,10 +236,10 @@ std::vector<SpectrumResult> SpectrumProcessorROCm::ProcessBatch(
 
     // ── Собрать события ──────────────────────────────────────────────────────
     if (prof_events) {
-        prof_events->push_back({"Upload",     MakeROCmDataFromEvents(ev_up_s,   ev_up_e,   1, "H2D")});
-        prof_events->push_back({"PadKernel",  MakeROCmDataFromEvents(ev_pad_s,  ev_pad_e,  0, "pad_kernel")});
-        prof_events->push_back({"FFT",        MakeROCmDataFromEvents(ev_fft_s,  ev_fft_e,  0, "hipfftExecC2C")});
-        prof_events->push_back({"PostKernel", MakeROCmDataFromEvents(ev_post_s, ev_post_e, 0, "post_kernel")});
+        prof_events->push_back({"Upload",     MakeROCmDataFromEvents(ev_up_s.get(), ev_up_e.get(),   1, "H2D")});
+        prof_events->push_back({"PadKernel",  MakeROCmDataFromEvents(ev_pad_s.get(), ev_pad_e.get(),  0, "pad_kernel")});
+        prof_events->push_back({"FFT",        MakeROCmDataFromEvents(ev_fft_s.get(), ev_fft_e.get(),  0, "hipfftExecC2C")});
+        prof_events->push_back({"PostKernel", MakeROCmDataFromEvents(ev_post_s.get(), ev_post_e.get(), 0, "post_kernel")});
         prof_events->push_back({"Download",   MakeROCmDataFromClock(t_dl_s,     t_dl_e,    1, "D2H")});
     }
 
@@ -478,46 +480,46 @@ AllMaximaResult SpectrumProcessorROCm::FindAllMaximaFromCPU(
     size_t total_elements = static_cast<size_t>(params_.antenna_count) * params_.nFFT;
 
     // ── Upload (H2D) ─────────────────────────────────────────────────────────
-    hipEvent_t ev_up_s = nullptr, ev_up_e = nullptr;
+    ScopedHipEvent ev_up_s, ev_up_e;
     if (prof_events) {
-        hipEventCreate(&ev_up_s); hipEventCreate(&ev_up_e);
-        hipEventRecord(ev_up_s, ctx_.stream());
+        ev_up_s.Create(); ev_up_e.Create();
+        hipEventRecord(ev_up_s.get(), ctx_.stream());
     }
     UploadData(data.data(), data.size());
-    if (prof_events) hipEventRecord(ev_up_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_up_e.get(), ctx_.stream());
 
     // ── PadKernel ────────────────────────────────────────────────────────────
-    hipEvent_t ev_pad_s = nullptr, ev_pad_e = nullptr;
+    ScopedHipEvent ev_pad_s, ev_pad_e;
     if (prof_events) {
-        hipEventCreate(&ev_pad_s); hipEventCreate(&ev_pad_e);
-        hipEventRecord(ev_pad_s, ctx_.stream());
+        ev_pad_s.Create(); ev_pad_e.Create();
+        hipEventRecord(ev_pad_s.get(), ctx_.stream());
     }
     ExecutePadKernel(params_.antenna_count);
-    if (prof_events) hipEventRecord(ev_pad_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_pad_e.get(), ctx_.stream());
 
     // ── FFT ──────────────────────────────────────────────────────────────────
-    hipEvent_t ev_fft_s = nullptr, ev_fft_e = nullptr;
+    ScopedHipEvent ev_fft_s, ev_fft_e;
     if (prof_events) {
-        hipEventCreate(&ev_fft_s); hipEventCreate(&ev_fft_e);
-        hipEventRecord(ev_fft_s, ctx_.stream());
+        ev_fft_s.Create(); ev_fft_e.Create();
+        hipEventRecord(ev_fft_s.get(), ctx_.stream());
     }
     ExecuteFFT();
-    if (prof_events) hipEventRecord(ev_fft_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_fft_e.get(), ctx_.stream());
 
     // ── ComputeMagnitudes ────────────────────────────────────────────────────
-    hipEvent_t ev_mag_s = nullptr, ev_mag_e = nullptr;
+    ScopedHipEvent ev_mag_s, ev_mag_e;
     if (prof_events) {
-        hipEventCreate(&ev_mag_s); hipEventCreate(&ev_mag_e);
-        hipEventRecord(ev_mag_s, ctx_.stream());
+        ev_mag_s.Create(); ev_mag_e.Create();
+        hipEventRecord(ev_mag_s.get(), ctx_.stream());
     }
     ExecuteComputeMagnitudes(total_elements);
-    if (prof_events) hipEventRecord(ev_mag_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_mag_e.get(), ctx_.stream());
 
     // ── Pipeline (Detect+Scan+Compact) ───────────────────────────────────────
-    hipEvent_t ev_pipe_s = nullptr, ev_pipe_e = nullptr;
+    ScopedHipEvent ev_pipe_s, ev_pipe_e;
     if (prof_events) {
-        hipEventCreate(&ev_pipe_s); hipEventCreate(&ev_pipe_e);
-        hipEventRecord(ev_pipe_s, ctx_.stream());
+        ev_pipe_s.Create(); ev_pipe_e.Create();
+        hipEventRecord(ev_pipe_s.get(), ctx_.stream());
     }
     hipStreamSynchronize(ctx_.stream());
 
@@ -526,16 +528,16 @@ AllMaximaResult SpectrumProcessorROCm::FindAllMaximaFromCPU(
         params_.antenna_count, params_.nFFT, params_.sample_rate,
         dest, search_start, search_end);
 
-    if (prof_events) hipEventRecord(ev_pipe_e, ctx_.stream());
+    if (prof_events) hipEventRecord(ev_pipe_e.get(), ctx_.stream());
 
     // ── Собрать события ──────────────────────────────────────────────────────
     if (prof_events) {
         hipStreamSynchronize(ctx_.stream());
-        prof_events->push_back({"Upload",            MakeROCmDataFromEvents(ev_up_s,   ev_up_e,   1, "H2D")});
-        prof_events->push_back({"PadKernel",         MakeROCmDataFromEvents(ev_pad_s,  ev_pad_e,  0, "pad_kernel")});
-        prof_events->push_back({"FFT",               MakeROCmDataFromEvents(ev_fft_s,  ev_fft_e,  0, "hipfftExecC2C")});
-        prof_events->push_back({"ComputeMagnitudes", MakeROCmDataFromEvents(ev_mag_s,  ev_mag_e,  0, "compute_mag")});
-        prof_events->push_back({"Pipeline",          MakeROCmDataFromEvents(ev_pipe_s, ev_pipe_e, 0, "detect+scan+compact")});
+        prof_events->push_back({"Upload",            MakeROCmDataFromEvents(ev_up_s.get(), ev_up_e.get(),   1, "H2D")});
+        prof_events->push_back({"PadKernel",         MakeROCmDataFromEvents(ev_pad_s.get(), ev_pad_e.get(),  0, "pad_kernel")});
+        prof_events->push_back({"FFT",               MakeROCmDataFromEvents(ev_fft_s.get(), ev_fft_e.get(),  0, "hipfftExecC2C")});
+        prof_events->push_back({"ComputeMagnitudes", MakeROCmDataFromEvents(ev_mag_s.get(), ev_mag_e.get(),  0, "compute_mag")});
+        prof_events->push_back({"Pipeline",          MakeROCmDataFromEvents(ev_pipe_s.get(), ev_pipe_e.get(), 0, "detect+scan+compact")});
     }
 
     return result;

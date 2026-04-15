@@ -14,6 +14,7 @@
 #include <spectrum/filters/iir_filter_rocm.hpp>
 #include "kernels/iir_kernels_rocm.hpp"
 #include <spectrum/utils/rocm_profiling_helpers.hpp>
+#include <core/services/scoped_hip_event.hpp>
 #include <core/services/console_output.hpp>
 
 #include <stdexcept>
@@ -21,6 +22,7 @@
 #include <algorithm>
 
 using fft_func_utils::MakeROCmDataFromEvents;
+using drv_gpu_lib::ScopedHipEvent;
 
 namespace filters {
 
@@ -131,11 +133,13 @@ IirFilterROCm::Process(void* input_ptr, uint32_t channels, uint32_t points,
   unsigned int grid_size = static_cast<unsigned int>(
       (channels + kBlockSize - 1) / kBlockSize);
 
-  hipEvent_t ev_k_s = nullptr, ev_k_e = nullptr;
+  // RAII-события: hipEventDestroy вызывается автоматически
+  // в ~ScopedHipEvent при выходе из scope (в т.ч. при throw).
+  ScopedHipEvent ev_k_s, ev_k_e;
   if (prof_events) {
-    hipEventCreate(&ev_k_s);
-    hipEventCreate(&ev_k_e);
-    hipEventRecord(ev_k_s, ctx_.stream());
+    ev_k_s.Create();
+    ev_k_e.Create();
+    hipEventRecord(ev_k_s.get(), ctx_.stream());
   }
 
   err = hipModuleLaunchKernel(
@@ -146,11 +150,10 @@ IirFilterROCm::Process(void* input_ptr, uint32_t channels, uint32_t points,
       args, nullptr);
 
   if (prof_events) {
-    hipEventRecord(ev_k_e, ctx_.stream());
+    hipEventRecord(ev_k_e.get(), ctx_.stream());
   }
 
   if (err != hipSuccess) {
-    if (ev_k_s) { hipEventDestroy(ev_k_s); hipEventDestroy(ev_k_e); }
     (void)hipFree(output_ptr);
     throw std::runtime_error(
         "IirFilterROCm::Process: hipModuleLaunchKernel failed: " +
@@ -161,7 +164,7 @@ IirFilterROCm::Process(void* input_ptr, uint32_t channels, uint32_t points,
 
   if (prof_events) {
     prof_events->push_back({"Kernel",
-        MakeROCmDataFromEvents(ev_k_s, ev_k_e, 0, "iir_filter")});
+        MakeROCmDataFromEvents(ev_k_s.get(), ev_k_e.get(), 0, "iir_filter")});
   }
 
   drv_gpu_lib::InputData<void*> result;
@@ -194,12 +197,12 @@ IirFilterROCm::ProcessFromCPU(
         "IirFilterROCm::ProcessFromCPU: hipMalloc(input) failed");
   }
 
-  // H2D Upload timing
-  hipEvent_t ev_up_s = nullptr, ev_up_e = nullptr;
+  // H2D Upload timing (RAII — события освобождаются в ~ScopedHipEvent)
+  ScopedHipEvent ev_up_s, ev_up_e;
   if (prof_events) {
-    hipEventCreate(&ev_up_s);
-    hipEventCreate(&ev_up_e);
-    hipEventRecord(ev_up_s, ctx_.stream());
+    ev_up_s.Create();
+    ev_up_e.Create();
+    hipEventRecord(ev_up_s.get(), ctx_.stream());
   }
 
   err = hipMemcpyHtoDAsync(input_ptr,
@@ -207,11 +210,10 @@ IirFilterROCm::ProcessFromCPU(
                             data_size, ctx_.stream());
 
   if (prof_events) {
-    hipEventRecord(ev_up_e, ctx_.stream());
+    hipEventRecord(ev_up_e.get(), ctx_.stream());
   }
 
   if (err != hipSuccess) {
-    if (ev_up_s) { hipEventDestroy(ev_up_s); hipEventDestroy(ev_up_e); }
     (void)hipFree(input_ptr);
     throw std::runtime_error(
         "IirFilterROCm::ProcessFromCPU: hipMemcpyHtoDAsync(input) failed");
@@ -220,7 +222,7 @@ IirFilterROCm::ProcessFromCPU(
 
   if (prof_events) {
     prof_events->push_back({"Upload",
-        MakeROCmDataFromEvents(ev_up_s, ev_up_e, 0, "H2D")});
+        MakeROCmDataFromEvents(ev_up_s.get(), ev_up_e.get(), 0, "H2D")});
   }
 
   auto result = Process(input_ptr, channels, points, prof_events);

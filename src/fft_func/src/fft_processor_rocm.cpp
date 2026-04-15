@@ -17,7 +17,7 @@
 #include "fft_processor_rocm.hpp"
 #include "kernels/fft_processor_kernels_rocm.hpp"
 #include <spectrum/utils/rocm_profiling_helpers.hpp>
-#include <spectrum/utils/scoped_hip_event.hpp>
+#include <core/services/scoped_hip_event.hpp>
 #include <core/services/gpu_profiler.hpp>
 #include <core/config/gpu_config.hpp>
 #include <core/logger/logger.hpp>
