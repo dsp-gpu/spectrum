@@ -4,6 +4,12 @@
  * @file complex_to_mag_phase_rocm.hpp
  * @brief ComplexToMagPhaseROCm -- direct complex-to-magnitude+phase conversion on GPU
  *
+ * @note НЕ путать с @ref fft_processor::MagPhaseOp (см. operations/mag_phase_op.hpp).
+ *       @ref MagPhaseOp — Layer 5 Op (строительный блок, 1 метод Execute),
+ *       используется как внутри FFTProcessorROCm, так и внутри этого класса.
+ *       А ComplexToMagPhaseROCm — Layer 6 Facade со своим BufferSet/GpuContext,
+ *       полноценный публичный API для случая "просто IQ → mag+phase без FFT".
+ *
  * Separate class for converting complex IQ data to magnitude+phase pairs.
  * Does NOT perform FFT -- pure mathematical conversion:
  *   magnitude = sqrt(re^2 + im^2)
