@@ -18,6 +18,9 @@ fetch_dsp_core()
 add_library(DspSpectrum STATIC)
 add_library(DspSpectrum::DspSpectrum ALIAS DspSpectrum)
 
+# PIC нужен для Python bindings (.so линкует static DspSpectrum)
+set_target_properties(DspSpectrum PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_sources(DspSpectrum PRIVATE
   # fft_func
   src/fft_func/src/fft_processor_rocm.cpp
@@ -45,6 +48,9 @@ target_include_directories(DspSpectrum
     # Kernels — hiprtc runtime, не компилируем, но include нужен
     kernels/
     src
+    # pocketfft — CPU FFT reference (header-only, BSD license)
+    # Используется через spectrum/utils/cpu_fft.hpp в тестах
+    third_party/pocketfft
 )
 target_link_libraries(DspSpectrum PUBLIC DspCore::DspCore hip::hipfft)
 target_compile_features(DspSpectrum PUBLIC cxx_std_17)

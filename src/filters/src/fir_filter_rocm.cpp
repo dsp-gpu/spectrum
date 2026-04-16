@@ -12,7 +12,7 @@
 #if ENABLE_ROCM
 
 #include <spectrum/filters/fir_filter_rocm.hpp>
-#include "kernels/fir_kernels_rocm.hpp"
+#include <spectrum/kernels/fir_kernels_rocm.hpp>
 #include <spectrum/utils/rocm_profiling_helpers.hpp>
 #include <core/services/scoped_hip_event.hpp>
 #include <core/services/console_output.hpp>

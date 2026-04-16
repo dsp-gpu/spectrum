@@ -20,6 +20,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_PREFIX_PATH": "/opt/rocm",
+        "ENABLE_ROCM": "1",
         "FETCHCONTENT_SOURCE_DIR_DSPCORE": "${sourceDir}/../core",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }

@@ -14,8 +14,8 @@
 
 #if ENABLE_ROCM
 
-#include "fft_processor_rocm.hpp"
-#include "kernels/fft_processor_kernels_rocm.hpp"
+#include <spectrum/fft_processor_rocm.hpp>
+#include <spectrum/kernels/fft_processor_kernels_rocm.hpp>
 #include <spectrum/utils/rocm_profiling_helpers.hpp>
 #include <core/services/scoped_hip_event.hpp>
 #include <core/services/gpu_profiler.hpp>
@@ -29,6 +29,7 @@
 
 using fft_func_utils::MakeROCmDataFromEvents;
 using fft_func_utils::MakeROCmDataFromClock;
+using drv_gpu_lib::ScopedHipEvent;
 
 namespace fft_processor {
 

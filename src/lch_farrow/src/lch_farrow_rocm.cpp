@@ -25,8 +25,8 @@
 
 #if ENABLE_ROCM
 
-#include "lch_farrow_rocm.hpp"
-#include "kernels/lch_farrow_kernels_rocm.hpp"
+#include <spectrum/lch_farrow_rocm.hpp>
+#include <spectrum/kernels/lch_farrow_kernels_rocm.hpp>
 #include <spectrum/utils/rocm_profiling_helpers.hpp>
 #include <core/services/scoped_hip_event.hpp>
 #include <core/services/console_output.hpp>

@@ -22,7 +22,7 @@
 
 #if ENABLE_ROCM
 
-#include <spectrum/fft_processor_types.hpp>
+#include <spectrum/types/fft_types.hpp>
 #include <spectrum/types/window_type.hpp>
 #include <core/interface/i_backend.hpp>
 #include <core/interface/gpu_context.hpp>

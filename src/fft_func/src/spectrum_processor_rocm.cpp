@@ -28,8 +28,8 @@
 #if ENABLE_ROCM
 
 #include <spectrum/processors/spectrum_processor_rocm.hpp>
-#include "kernels/fft_kernel_sources_rocm.hpp"
-#include "kernels/all_maxima_kernel_sources_rocm.hpp"
+#include <spectrum/kernels/fft_kernel_sources_rocm.hpp>
+#include <spectrum/kernels/all_maxima_kernel_sources_rocm.hpp>
 #include <spectrum/utils/rocm_profiling_helpers.hpp>
 #include <core/services/scoped_hip_event.hpp>
 #include <core/services/console_output.hpp>

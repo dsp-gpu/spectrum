@@ -9,7 +9,7 @@
 #if ENABLE_ROCM
 
 #include <spectrum/filters/kaufman_filter_rocm.hpp>
-#include "kernels/kaufman_kernels_rocm.hpp"
+#include <spectrum/kernels/kaufman_kernels_rocm.hpp>
 #include <core/services/console_output.hpp>
 
 #include <stdexcept>
@@ -206,7 +206,10 @@ KaufmanFilterROCm::ProcessFromCPU(
     cached_input_size_ = buffer_size;
   }
 
-  hipMemcpyHtoDAsync(cached_input_buf_, data.data(), buffer_size, ctx_.stream());
+  hipError_t merr = hipMemcpyHtoDAsync(cached_input_buf_, data.data(), buffer_size, ctx_.stream());
+  if (merr != hipSuccess)
+    throw std::runtime_error("KaufmanFilterROCm: hipMemcpyHtoDAsync failed: " +
+                              std::string(hipGetErrorString(merr)));
   return Process(cached_input_buf_, channels, points);
 }
 

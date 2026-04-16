@@ -11,7 +11,10 @@ target_include_directories(dsp_spectrum PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_SOURCE_DIR}/src/fft_func/include
   ${CMAKE_SOURCE_DIR}/src/filters/include
-  ${CMAKE_SOURCE_DIR}/src/lch_farrow/include)
+  ${CMAKE_SOURCE_DIR}/src/lch_farrow/include
+  ${CMAKE_SOURCE_DIR}/third_party/pocketfft
+  # py_gpu_context.hpp — ROCmGPUContext shared header
+  ${FETCHCONTENT_SOURCE_DIR_DSPCORE}/python)
 target_compile_definitions(dsp_spectrum PRIVATE
   $<$<BOOL:${ENABLE_ROCM}>:ENABLE_ROCM=1>)
 install(TARGETS dsp_spectrum DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
