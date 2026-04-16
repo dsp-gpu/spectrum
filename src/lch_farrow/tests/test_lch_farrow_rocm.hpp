@@ -303,6 +303,7 @@ inline bool test_multi_antenna(ConsoleOutput& con, int gpu_id) {
 
 inline void run() {
   auto& con = drv_gpu_lib::ConsoleOutput::GetInstance();
+  con.Start();
   int gpu_id = 0;
 
   con.Print(gpu_id, "LchFarrow[ROCm]", "");
@@ -323,6 +324,7 @@ inline void run() {
             std::to_string(total) + " passed");
   con.Print(gpu_id, "LchFarrow[ROCm]", "============================================");
   con.Print(gpu_id, "LchFarrow[ROCm]", "");
+  con.WaitEmpty();
 }
 
 #else  // !ENABLE_ROCM
