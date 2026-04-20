@@ -16,7 +16,7 @@
  * Профилирование через опциональный prof_events (ROCmProfEvents*):
  *  - ExecuteKernel()      → ProcessComplex(data, params)         — без событий
  *  - ExecuteKernelTimed() → ProcessComplex(data, params, &events) — с hipEvent_t
- *    → RecordROCmEvent() для каждого события → GPUProfiler
+ *    → ProfilingFacade::BatchRecord(events) — одним вызовом в profiler v2
  *
  * Stages: Upload (H2D), Pad (kernel), FFT (hipfftExecC2C), Download (D2H)
  *
@@ -29,6 +29,7 @@
 
 #include <spectrum/fft_processor_rocm.hpp>
 #include <core/services/gpu_benchmark_base.hpp>
+#include <core/services/profiling/profiling_facade.hpp>
 
 #include <complex>
 #include <vector>
@@ -70,20 +71,20 @@ protected:
   }
 
   /**
-   * @brief Замер — запуск FFT С timing → RecordROCmEvent → GPUProfiler
+   * @brief Замер — запуск FFT С timing → ProfilingFacade::BatchRecord
    *
    * ProcessComplex() с prof_events → собирает ROCmProfilingData:
    *   Upload (H2D), Pad (kernel), FFT (hipfftExecC2C), Download (D2H)
-   * Каждое событие записывается отдельно через RecordROCmEvent().
-   * GPUProfiler копит все вызовы → min/max/avg автоматически.
+   * Все события передаются одним вызовом BatchRecord() в новый
+   * ProfilingFacade (profiler v2). Одно сообщение в queue вместо N —
+   * меньше contention (W1 из Round 3 ревью).
    */
   void ExecuteKernelTimed() override {
     fft_processor::ROCmProfEvents events;
     proc_.ProcessComplex(input_data_, params_, &events);
 
-    for (auto& [name, data] : events) {
-      RecordROCmEvent(name, data);  // → GPUProfiler
-    }
+    drv_gpu_lib::profiling::ProfilingFacade::GetInstance()
+        .BatchRecord(gpu_id_, "spectrum/fft", events);
   }
 
 private:
