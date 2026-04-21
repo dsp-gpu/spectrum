@@ -8,7 +8,7 @@
  * Профилирование через опциональный prof_events (ROCmProfEvents*):
  *  - ExecuteKernel()      → ProcessFromCPU(...) — без событий (warmup)
  *  - ExecuteKernelTimed() → ProcessFromCPU(..., &events) — с hipEvent_t
- *    → RecordROCmEvent() для каждого события → GPUProfiler
+ *    → ProfilingFacade::BatchRecord(events) — одним вызовом в profiler v2
  *
  * Stages (ProcessFromCPU):
  *  - Upload_input : hipMemcpyHtoDAsync (входной сигнал → GPU)
@@ -24,6 +24,7 @@
 
 #include <spectrum/lch_farrow_rocm.hpp>
 #include <core/services/gpu_benchmark_base.hpp>
+#include <core/services/profiling/profiling_facade.hpp>
 
 #include <hip/hip_runtime.h>
 #include <vector>
@@ -70,21 +71,20 @@ protected:
   }
 
   /**
-   * @brief Замер — запуск С timing → RecordROCmEvent → GPUProfiler
+   * @brief Замер — запуск С timing → ProfilingFacade::BatchRecord
    *
    * ProcessFromCPU() с prof_events → собирает ROCmProfilingData:
    *   Upload_input (H2D), Upload_delay (H2D), Kernel (lch_farrow_delay)
-   * Каждое событие записывается через RecordROCmEvent().
-   * GPUProfiler копит все вызовы → min/max/avg автоматически.
+   * Все события передаются одним вызовом BatchRecord в новый
+   * ProfilingFacade (profiler v2).
    */
   void ExecuteKernelTimed() override {
     lch_farrow::ROCmProfEvents events;
     auto result = proc_.ProcessFromCPU(input_data_, antennas_, points_, &events);
     if (result.data) hipFree(result.data);
 
-    for (auto& [name, data] : events) {
-      RecordROCmEvent(name, data);
-    }
+    drv_gpu_lib::profiling::ProfilingFacade::GetInstance()
+        .BatchRecord(gpu_id_, "spectrum/lch_farrow", events);
   }
 
 private:

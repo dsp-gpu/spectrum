@@ -21,6 +21,7 @@
 
 #include <spectrum/processors/spectrum_processor_rocm.hpp>
 #include <core/services/gpu_benchmark_base.hpp>
+#include <core/services/profiling/profiling_facade.hpp>
 
 #include <complex>
 #include <vector>
@@ -55,12 +56,12 @@ protected:
     proc_.ProcessFromCPU(input_data_);
   }
 
-  /// Замер: ProcessFromCPU с ROCmProfEvents → RecordROCmEvent → GPUProfiler
+  /// Замер: ProcessFromCPU с ROCmProfEvents → ProfilingFacade::BatchRecord
   void ExecuteKernelTimed() override {
     antenna_fft::ROCmProfEvents events;
     proc_.ProcessFromCPU(input_data_, &events);
-    for (auto& [name, data] : events)
-      RecordROCmEvent(name, data);
+    drv_gpu_lib::profiling::ProfilingFacade::GetInstance()
+        .BatchRecord(gpu_id_, "spectrum/fft", events);
   }
 
 private:
@@ -97,14 +98,14 @@ protected:
                                antenna_fft::OutputDestination::CPU, 1, 0);
   }
 
-  /// Замер: FindAllMaximaFromCPU с ROCmProfEvents → RecordROCmEvent → GPUProfiler
+  /// Замер: FindAllMaximaFromCPU с ROCmProfEvents → ProfilingFacade::BatchRecord
   void ExecuteKernelTimed() override {
     antenna_fft::ROCmProfEvents events;
     proc_.FindAllMaximaFromCPU(input_data_,
                                antenna_fft::OutputDestination::CPU, 1, 0,
                                &events);
-    for (auto& [name, data] : events)
-      RecordROCmEvent(name, data);
+    drv_gpu_lib::profiling::ProfilingFacade::GetInstance()
+        .BatchRecord(gpu_id_, "spectrum/fft", events);
   }
 
 private:

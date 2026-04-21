@@ -20,6 +20,7 @@
 #include <spectrum/filters/fir_filter_rocm.hpp>
 #include <spectrum/filters/iir_filter_rocm.hpp>
 #include <core/services/gpu_benchmark_base.hpp>
+#include <core/services/profiling/profiling_facade.hpp>
 
 #include <complex>
 #include <vector>
@@ -61,12 +62,12 @@ protected:
     hipFree(result.data);
   }
 
-  /// Замер — ProcessFromCPU с ROCmProfEvents → RecordROCmEvent → GPUProfiler
+  /// Замер — ProcessFromCPU с ROCmProfEvents → ProfilingFacade::BatchRecord
   void ExecuteKernelTimed() override {
     filters::ROCmProfEvents events;
     auto result = filter_.ProcessFromCPU(input_data_, channels_, points_, &events);
-    for (auto& [name, data] : events)
-      RecordROCmEvent(name, data);
+    drv_gpu_lib::profiling::ProfilingFacade::GetInstance()
+        .BatchRecord(gpu_id_, "spectrum/filters", events);
     hipFree(result.data);
   }
 
@@ -111,12 +112,12 @@ protected:
     hipFree(result.data);
   }
 
-  /// Замер — ProcessFromCPU с ROCmProfEvents → RecordROCmEvent → GPUProfiler
+  /// Замер — ProcessFromCPU с ROCmProfEvents → ProfilingFacade::BatchRecord
   void ExecuteKernelTimed() override {
     filters::ROCmProfEvents events;
     auto result = filter_.ProcessFromCPU(input_data_, channels_, points_, &events);
-    for (auto& [name, data] : events)
-      RecordROCmEvent(name, data);
+    drv_gpu_lib::profiling::ProfilingFacade::GetInstance()
+        .BatchRecord(gpu_id_, "spectrum/filters", events);
     hipFree(result.data);
   }
 

@@ -22,6 +22,7 @@
 #include "test_lch_farrow_rocm.hpp"
 #include "test_lch_farrow_benchmark_rocm.hpp"
 #include "test_fft_cpu_reference_rocm.hpp"
+#include "test_gate3_fft_profiler_v2.hpp"
 #endif
 
 namespace lch_farrow_all_test {
@@ -31,6 +32,7 @@ inline void run() {
     test_lch_farrow_rocm::run();
     test_fft_cpu_reference::run();
     // test_lch_farrow_benchmark_rocm::run();
+    test_gate3_fft_profiler_v2::run();
 #endif
 }
 
