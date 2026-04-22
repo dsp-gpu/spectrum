@@ -134,9 +134,10 @@ void MovingAverageFilterROCm::EnsureKernels() {
   if (compiled_ && !sma_window_changed) return;
 
   if (compiled_) {
-    // N_WINDOW changed — need to recompile. Reconstruct GpuContext to reset module.
-    auto* backend = ctx_.backend();
-    ctx_ = drv_gpu_lib::GpuContext(backend, "SMA", "modules/filters/kernels");
+    // N_WINDOW changed — re-compile with new CompileKey (disk cache v2 will
+    // coexist all variants). No GpuContext recreate needed: ReleaseModule()
+    // frees current hipModule, next CompileModule() takes the new defines.
+    ctx_.ReleaseModule();
     compiled_ = false;
   }
 

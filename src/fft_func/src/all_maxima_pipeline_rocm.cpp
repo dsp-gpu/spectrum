@@ -15,7 +15,7 @@
 #include <spectrum/kernels/all_maxima_kernel_sources_rocm.hpp>
 #include <core/services/console_output.hpp>
 #include <core/services/gpu_profiler.hpp>
-#include <core/services/kernel_cache_service.hpp>
+#include <core/services/cache_dir_resolver.hpp>
 #include <core/backends/rocm/rocm_backend.hpp>
 
 #include <cstring>
@@ -49,153 +49,54 @@ AllMaximaPipelineROCm::AllMaximaPipelineROCm(hipStream_t stream,
     }
 }
 
-/**
- * @brief Деструктор — выгружает hipModule (освобождает все kernel'ы одним вызовом)
- * hipModuleUnload освобождает module + все связанные hipFunction_t автоматически.
- */
-AllMaximaPipelineROCm::~AllMaximaPipelineROCm() {
-    if (module_) {
-        (void)hipModuleUnload(module_);
-        module_ = nullptr;
-    }
-    detect_kernel_ = nullptr;
-    block_scan_kernel_ = nullptr;
-    block_add_kernel_ = nullptr;
-    compact_kernel_ = nullptr;
-    kernels_compiled_ = false;
-}
+/// Destructor — GpuContext owns hipModule, self-releases via unique_ptr.
+AllMaximaPipelineROCm::~AllMaximaPipelineROCm() = default;
 
 // ════════════════════════════════════════════════════════════════════════════
 // CompileKernels — hiprtc compilation
 // ════════════════════════════════════════════════════════════════════════════
 
 /**
- * @brief Скомпилировать HIP kernel'ы через hiprtc (idempotent)
+ * @brief Compile all 4 kernels via GpuContext (idempotent, disk-cached v2).
  *
- * Один hipModule содержит все 4 функции: detect_all_maxima, block_scan, block_add, compact_maxima.
- * Компилируется с -O3. Source из GetAllMaximaHIPKernelSource() (inline строка в all_maxima_kernel_sources_rocm.hpp).
- *
- * Почему hiprtc (не hipModuleLoad из файла):
- * - Нет зависимости от пути к .co файлам в runtime
- * - Компиляция под текущую GPU архитектуру (gfx1201 и др.)
- *
- * @throws std::runtime_error при ошибке компиляции (с полным hiprtc build log)
+ * GpuContext::CompileModule handles hiprtc + KernelCacheService (key-based).
+ * CompileKey includes source + defines + arch + hiprtc_version → HSACO reuse
+ * across processes/runs. WARP_SIZE passed as define because kernels use it.
  */
 void AllMaximaPipelineROCm::CompileKernels() {
-    if (kernels_compiled_) return;
+    if (ctx_ && ctx_->IsCompiled()) return;  // idempotent
 
     auto& con = drv_gpu_lib::ConsoleOutput::GetInstance();
-    constexpr const char* kCacheName = "all_maxima_kernels";
-    const char* src = kernels::GetAllMaximaHIPKernelSource();
 
-    // ── Try loading from disk cache (HSACO) ──
-    drv_gpu_lib::KernelCacheService cache(
-        "modules/fft_func/kernels", drv_gpu_lib::BackendType::ROCm);
-    {
-        auto entry = cache.Load(kCacheName);
-        if (entry && entry->has_binary()) {
-            hipError_t hip_err = hipModuleLoadData(&module_, entry->binary.data());
-            if (hip_err == hipSuccess) {
-                hip_err = hipModuleGetFunction(&detect_kernel_, module_, "detect_all_maxima");
-                if (hip_err == hipSuccess)
-                    hip_err = hipModuleGetFunction(&block_scan_kernel_, module_, "block_scan");
-                if (hip_err == hipSuccess)
-                    hip_err = hipModuleGetFunction(&block_add_kernel_, module_, "block_add");
-                if (hip_err == hipSuccess)
-                    hip_err = hipModuleGetFunction(&compact_kernel_, module_, "compact_maxima");
-                if (hip_err == hipSuccess) {
-                    kernels_compiled_ = true;
-                    con.Print(0, "AllMaximaPipelineROCm",
-                        "Pipeline kernels loaded from cache (HSACO)");
-                    return;
-                }
-            }
-            if (module_) { hipModuleUnload(module_); module_ = nullptr; }
-        }
+    // Lazy-create GpuContext (owns hipModule + disk cache).
+    if (!ctx_) {
+        ctx_ = std::make_unique<drv_gpu_lib::GpuContext>(
+            backend_,
+            "AllMaxima",
+            drv_gpu_lib::ResolveCacheDir("fft_func"));
     }
 
-    // ── Compile from source (hiprtc) ──
-    hiprtcProgram prog;
-    hiprtcResult rtc_err = hiprtcCreateProgram(&prog, src, "all_maxima_kernels.hip",
-                                                0, nullptr, nullptr);
-    if (rtc_err != HIPRTC_SUCCESS) {
-        throw std::runtime_error("AllMaximaPipelineROCm: hiprtcCreateProgram failed: " +
-                                  std::string(hiprtcGetErrorString(rtc_err)));
-    }
-
-    // Build compile options: -O3, --offload-arch, -DWARP_SIZE
-    std::string arch_name;
+    // Pass WARP_SIZE as define so different GPUs get separate cache entries.
     int warp_size = 32;
     try {
         auto* rocm_backend = static_cast<drv_gpu_lib::ROCmBackend*>(backend_);
-        arch_name = rocm_backend->GetCore().GetArchName();
         warp_size = rocm_backend->GetCore().GetWarpSize();
-    } catch (...) {
-        arch_name = "";
-    }
-    std::string warp_define = "-DWARP_SIZE=" + std::to_string(warp_size);
-    std::string arch_flag = arch_name.empty() ? "" : ("--offload-arch=" + arch_name);
-    std::vector<const char*> opts = {"-O3", warp_define.c_str()};
-    if (!arch_flag.empty())
-        opts.push_back(arch_flag.c_str());
+    } catch (...) {}
+    std::vector<std::string> defines{"-DWARP_SIZE=" + std::to_string(warp_size)};
 
-    rtc_err = hiprtcCompileProgram(prog,
-        static_cast<int>(opts.size()), opts.data());
-    if (rtc_err != HIPRTC_SUCCESS) {
-        size_t log_size = 0;
-        hiprtcGetProgramLogSize(prog, &log_size);
-        std::string log(log_size, '\0');
-        hiprtcGetProgramLog(prog, log.data());
+    const char* src = kernels::GetAllMaximaHIPKernelSource();
+    ctx_->CompileModule(src,
+                        {"detect_all_maxima", "block_scan",
+                         "block_add", "compact_maxima"},
+                        defines);
 
-        con.PrintError(0, "AllMaximaPipelineROCm", "Kernel compile log:\n" + log);
-
-        (void)hiprtcDestroyProgram(&prog);
-        throw std::runtime_error("AllMaximaPipelineROCm: hiprtcCompileProgram failed: " +
-                                  std::string(hiprtcGetErrorString(rtc_err)));
-    }
-
-    size_t code_size = 0;
-    hiprtcGetCodeSize(prog, &code_size);
-    std::vector<char> code(code_size);
-    hiprtcGetCode(prog, code.data());
-    (void)hiprtcDestroyProgram(&prog);
-
-    hipError_t hip_err = hipModuleLoadData(&module_, code.data());
-    if (hip_err != hipSuccess) {
-        throw std::runtime_error("AllMaximaPipelineROCm: hipModuleLoadData failed: " +
-                                  std::string(hipGetErrorString(hip_err)));
-    }
-
-    hip_err = hipModuleGetFunction(&detect_kernel_, module_, "detect_all_maxima");
-    if (hip_err != hipSuccess)
-        throw std::runtime_error("AllMaximaPipelineROCm: get detect_all_maxima failed");
-
-    hip_err = hipModuleGetFunction(&block_scan_kernel_, module_, "block_scan");
-    if (hip_err != hipSuccess)
-        throw std::runtime_error("AllMaximaPipelineROCm: get block_scan failed");
-
-    hip_err = hipModuleGetFunction(&block_add_kernel_, module_, "block_add");
-    if (hip_err != hipSuccess)
-        throw std::runtime_error("AllMaximaPipelineROCm: get block_add failed");
-
-    hip_err = hipModuleGetFunction(&compact_kernel_, module_, "compact_maxima");
-    if (hip_err != hipSuccess)
-        throw std::runtime_error("AllMaximaPipelineROCm: get compact_maxima failed");
-
-    kernels_compiled_ = true;
-
-    // ── Save to cache for next run ──
-    try {
-        std::vector<uint8_t> binary(code.begin(), code.end());
-        cache.Save(kCacheName, std::string(src), binary,
-                   arch_name, "all_maxima: detect + scan + add + compact");
-    } catch (...) {
-        // Non-critical
-    }
+    detect_kernel_     = ctx_->GetKernel("detect_all_maxima");
+    block_scan_kernel_ = ctx_->GetKernel("block_scan");
+    block_add_kernel_  = ctx_->GetKernel("block_add");
+    compact_kernel_    = ctx_->GetKernel("compact_maxima");
 
     con.Print(0, "AllMaximaPipelineROCm",
-        "Pipeline kernels compiled (detect + scan + compact)" +
-        (arch_name.empty() ? "" : " [" + arch_name + "]"));
+              "Pipeline kernels ready (detect + scan + compact)");
 }
 
 // ════════════════════════════════════════════════════════════════════════════
