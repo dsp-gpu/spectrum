@@ -116,9 +116,9 @@ void KaufmanFilterROCm::EnsureKernel() {
   if (compiled_ && compiled_window_size_ == er) return;
 
   if (compiled_) {
-    // N_WINDOW changed — need to recompile. Reconstruct GpuContext to reset module.
-    auto* backend = ctx_.backend();
-    ctx_ = drv_gpu_lib::GpuContext(backend, "KAMA", "modules/filters/kernels");
+    // er changed — re-compile with new CompileKey (disk cache v2 coexists).
+    // No GpuContext recreate needed: ReleaseModule() frees current hipModule.
+    ctx_.ReleaseModule();
     compiled_ = false;
   }
 
