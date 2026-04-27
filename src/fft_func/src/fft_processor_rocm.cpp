@@ -18,7 +18,6 @@
 #include <spectrum/kernels/fft_processor_kernels_rocm.hpp>
 #include <spectrum/utils/rocm_profiling_helpers.hpp>
 #include <core/services/scoped_hip_event.hpp>
-#include <core/services/gpu_profiler.hpp>
 #include <core/config/gpu_config.hpp>
 #include <core/logger/logger.hpp>
 #include <core/services/console_output.hpp>
@@ -688,23 +687,17 @@ size_t FFTProcessorROCm::CalculateBytesPerBeam(FFTOutputMode mode) const {
 }
 
 FFTProfilingData FFTProcessorROCm::GetProfilingData() const {
-  FFTProfilingData out{};
-  const int gpu_id = ctx_.backend() ? ctx_.backend()->GetDeviceIndex() : 0;
-  auto stats = drv_gpu_lib::GPUProfiler::GetInstance().GetStats(gpu_id);
-  auto it = stats.find("FFTProcessorROCm");
-  if (it == stats.end()) return out;
-
-  const auto& mod = it->second;
-  auto ev = [&mod](const char* name) -> double {
-    auto e = mod.events.find(name);
-    return (e != mod.events.end()) ? e->second.GetAvgTimeMs() : 0.0;
-  };
-  out.upload_time_ms = ev("Upload");
-  out.fft_time_ms = ev("FFT");
-  out.post_processing_time_ms = ev("PostProcessing");
-  out.download_time_ms = ev("Download");
-  out.total_time_ms = mod.GetTotalTimeMs();
-  return out;
+  // ProfilingFacade v2 (collect-then-compute) не предоставляет агрегированную
+  // статистику по «module/event» через GetStats() — снапшот ProfileStore'а
+  // даёт сырые ProfilingRecord'ы, а агрегацию делают экспортёры (JSON/MD)
+  // и ProfileAnalyzer. Per-call helper FFTProfilingData больше не нужен:
+  // benchmark-pipeline'ы (Phase D) пишут события через BatchRecord и
+  // получают отчёт через ProfilingFacade::ExportJsonAndMarkdown / PrintReport.
+  //
+  // Если потребуется per-module aggregate по старому контракту —
+  // вынести в utility-функцию поверх ProfilingFacade::GetSnapshot()
+  // (pattern: filter by module + group by event_name).
+  return FFTProfilingData{};
 }
 
 }  // namespace fft_processor

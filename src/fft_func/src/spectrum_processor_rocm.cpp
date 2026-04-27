@@ -33,7 +33,6 @@
 #include <spectrum/utils/rocm_profiling_helpers.hpp>
 #include <core/services/scoped_hip_event.hpp>
 #include <core/services/console_output.hpp>
-#include <core/services/gpu_profiler.hpp>
 #include <core/services/batch_manager.hpp>
 #include <core/interface/i_backend.hpp>
 #include <core/services/profiling_types.hpp>
@@ -1344,7 +1343,7 @@ void SpectrumProcessorROCm::ReleaseResources() {
  *
  * ROCm версия пока возвращает пустой ProfilingData.
  * Профилирование передаётся через ROCmProfEvents* в ProcessBatch/FindAllMaximaFromCPU.
- * Агрегация в GPUProfiler происходит на уровне benchmark тестов, не здесь.
+ * Агрегация в ProfilingFacade происходит на уровне benchmark тестов, не здесь.
  *
  * @return Пустой ProfilingData (временная заглушка)
  */

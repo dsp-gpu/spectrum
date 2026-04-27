@@ -28,7 +28,7 @@
 #include <core/interface/gpu_context.hpp>
 #include <core/services/buffer_set.hpp>
 #include <core/services/batch_manager.hpp>
-#include <core/services/gpu_profiler.hpp>
+#include <core/services/profiling_types.hpp>
 
 // Op classes (Layer 5)
 #include <spectrum/operations/pad_data_op.hpp>
