@@ -5,8 +5,6 @@ test_cpu_fft.py — standalone тест CpuFFT Python API (pocketfft)
 Запуск:
   cd spectrum/build
   python3 ../python/test_cpu_fft.py
-
-НЕ использует pytest (запрещён в CLAUDE.md).
 """
 
 import sys
