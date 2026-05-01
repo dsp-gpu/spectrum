@@ -2,12 +2,16 @@
 
 /**
  * @file filter_params.hpp
- * @brief Parameter types for FIR and IIR filters
+ * @brief Параметры фильтров spectrum/filters: FIR/IIR/MovingAverage/Kalman/Kaufman + JSON-loader.
  *
- * BiquadSection, FirParams, IirParams, FilterConfig (JSON loading).
+ * @note Тип B (technical header): POD-конфиги + один минималистичный JSON-парсер
+ *       FilterConfig::LoadJson (без зависимости от nlohmann/json — header-only,
+ *       чтобы не тащить тяжёлую зависимость в публичный API).
+ * @note BiquadSection — Direct Form II Transposed; a0 нормализован к 1.0.
  *
- * @author Kodo (AI Assistant)
- * @date 2026-02-18
+ * История:
+ *   - Создан:  2026-02-18
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 #include <vector>

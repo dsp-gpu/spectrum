@@ -2,10 +2,13 @@
 
 /**
  * @file filter_types.hpp
- * @brief Result types and common typedefs for filter module
+ * @brief Общие алиасы фильтров (ComplexVector, ComplexVector2D).
  *
- * @author Kodo (AI Assistant)
- * @date 2026-02-18
+ * @note Тип B (technical header): только typedef-алиасы, без struct/enum/логики.
+ *
+ * История:
+ *   - Создан:  2026-02-18
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 #include <complex>

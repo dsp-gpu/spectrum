@@ -1,18 +1,43 @@
 #pragma once
 
-/**
- * @file kalman_filter_rocm.hpp
- * @brief KalmanFilterROCm - GPU 1D scalar Kalman filter (ROCm/HIP)
- *
- * Applies independent scalar Kalman filters to Re and Im parts.
- * Grid: 1D — one thread per channel, sequential predict-update loop.
- *
- * Application: smoothing f_beat (radar range estimation),
- * amplitude filtering, angular tracking.
- *
- * @author Kodo (AI Assistant)
- * @date 2026-03-01
- */
+// ============================================================================
+// KalmanFilterROCm — GPU 1D скалярный фильтр Калмана (ROCm/HIP)
+//
+// ЧТО:    Применяет независимый скалярный фильтр Калмана к Re и Im частям
+//         комплексного сигнала [channels × points × complex<float>].
+//         Один поток обрабатывает один канал последовательно (predict-update
+//         loop по samples). State (x, P) переменные хранятся в регистрах
+//         потока, не в global memory.
+//
+// ЗАЧЕМ:  В радар-пайплайне Калман нужен для:
+//           - сглаживания f_beat (range estimation),
+//           - фильтрации амплитуды по антеннам,
+//           - углового tracking'а.
+//         CPU-реализация на 1024+ каналах = bottleneck, GPU параллелит по
+//         каналам, оставляя последовательность по времени внутри канала.
+//
+// ПОЧЕМУ: - Скалярный 1D Kalman (а не векторный) — Re и Im обрабатываются
+//           независимо. Это упрощение оправдано: для f_beat хватает
+//           скалярного state-space, а векторный требовал бы 4×4 матрицы и
+//           регистрового spill'а.
+//         - Grid 1D, 1 thread = 1 channel — рекурсия x[n] = f(x[n-1])
+//           параллелится только между каналами, не внутри.
+//         - cached_input_buf_ — переиспользование GPU-буфера для одинаковых
+//           размеров: hipMalloc/hipFree (~0.5ms каждый) убраны из hot-path
+//           ProcessFromCPU. Освобождается в ReleaseGpuResources / dtor.
+//         - block_size_ конфигурируемый (default 256) — на коротких channels
+//           уменьшение даёт лучшую occupancy для radar-сценариев.
+//
+// Использование:
+//   filters::KalmanFilterROCm kf(rocm_backend);
+//   kf.SetParams(/*Q=*/1e-3f, /*R=*/0.1f, /*x0=*/0.0f, /*P0=*/25.0f);
+//   auto result = kf.ProcessFromCPU(data, channels, points);
+//   // result.data — void*, caller обязан hipFree
+//
+// История:
+//   - Создан:  2026-03-01 (1D Kalman для radar range estimation)
+//   - Изменён: 2026-04-15 (миграция в DSP-GPU/spectrum, GpuContext Ref03)
+// ============================================================================
 
 #if ENABLE_ROCM
 
@@ -29,7 +54,17 @@
 
 namespace filters {
 
-/// @ingroup grp_filters
+/**
+ * @class KalmanFilterROCm
+ * @brief GPU 1D скалярный фильтр Калмана (Re/Im независимо), one-thread-per-channel.
+ *
+ * @note Move-only. Требует #if ENABLE_ROCM (CPU-only сборки получают stub).
+ * @note Параллелизм только по каналам (рекурсия по времени внутри канала).
+ * @note cached_input_buf_ переиспользуется при одинаковых размерах (hot-path optimization).
+ * @note Не thread-safe (один экземпляр = один владелец GPU-ресурсов).
+ * @see filters::KaufmanFilterROCm — адаптивная альтернатива (KAMA)
+ * @ingroup grp_filters
+ */
 class KalmanFilterROCm {
 public:
   explicit KalmanFilterROCm(drv_gpu_lib::IBackend* backend,

@@ -2,18 +2,19 @@
 
 /**
  * @file fir_kernels_rocm.hpp
- * @brief HIP kernel sources for FIR filter (ROCm)
+ * @brief HIP kernel-source для FIR-фильтра (Direct-form свёртка, complex float).
  *
- * Port of fir_kernels.hpp (OpenCL) to HIP/ROCm.
- * Uses hiprtc for runtime compilation.
+ * @note Тип B (technical header): R"HIP(...)HIP" source для hiprtc.
+ *       Kernel: fir_filter_cf32
+ *         - 1D grid: total_points = channels × points (один поток = один выходной отсчёт)
+ *         - y[ch][n] = Σ h[k] · x[ch][n-k], k=0..num_taps-1
+ *         - Без __constant vs __global split: HIP L1/L2 кэш даёт сравнимую производительность
+ *           с OpenCL __constant memory.
+ * @note Порт из fir_kernels.hpp (OpenCL → HIP/ROCm).
  *
- * Kernel: fir_filter_cf32
- *   - 1D grid: total_points = channels * points
- *   - Each thread: one output sample y[ch][n]
- *   - y[ch][n] = sum_{k=0}^{num_taps-1} h[k] * x[ch][n-k]
- *
- * @author Kodo (AI Assistant)
- * @date 2026-02-23
+ * История:
+ *   - Создан:  2026-02-23
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 namespace filters {

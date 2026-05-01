@@ -2,13 +2,25 @@
 
 /**
  * @file moving_average_kernels_rocm.hpp
- * @brief HIP kernel source for Moving Average filters (SMA, EMA, MMA, DEMA, TEMA)
+ * @brief HIP kernel-source для Moving Average фильтров: SMA / EMA / MMA / DEMA / TEMA.
  *
- * All kernels use 1D grid: one thread per channel, sequential loop over points.
- * Input/output: complex float (float2_t = {re, im}).
+ * @note Тип B (technical header): R"HIP(...)HIP" source для hiprtc.
+ *       Все ядра: 1D grid, один поток на канал, sequential loop по points.
+ *       Input/output — complex float (float2_t = {re, im}).
+ * @note Типы:
+ *         - SMA  — Simple MA (ring buffer, equal weights 1/N)
+ *         - EMA  — Exponential MA (alpha = 2/(N+1))
+ *         - MMA  — Modified MA / Wilder's (alpha = 1/N)
+ *         - DEMA — Double EMA (2·EMA1 - EMA2)
+ *         - TEMA — Triple EMA (3·EMA1 - 3·EMA2 + EMA3)
+ * @note ⚠️ N_WINDOW = compile-time константа через `-DN_WINDOW=<window_size>` из
+ *       MovingAverageFilterROCm::CompileKernels(sma_window). Используется только
+ *       для SMA ring buffer. НЕ заменять на фиксированное! Причина: thread-local
+ *       ring[N] при BLOCK_SIZE=256 → scratch overflow → SIGSEGV на RDNA4.
  *
- * @author Kodo (AI Assistant)
- * @date 2026-03-01
+ * История:
+ *   - Создан:  2026-03-01
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 namespace filters {

@@ -1,28 +1,41 @@
 #pragma once
 
-/**
- * @file fir_filter_rocm.hpp
- * @brief FirFilterROCm - GPU FIR convolution filter (ROCm/HIP)
- *
- * ROCm port of FirFilter (OpenCL). Same algorithm, HIP runtime:
- * - hiprtc for kernel compilation
- * - void* device pointers instead of cl_mem
- * - hipStream_t instead of cl_command_queue
- *
- * Compiles ONLY with ENABLE_ROCM=1 (Linux + AMD GPU).
- *
- * Usage:
- * @code
- * FirFilterROCm fir(rocm_backend);
- * fir.SetCoefficients({0.1f, 0.2f, 0.4f, 0.2f, 0.1f});
- *
- * auto result = fir.Process(gpu_input, channels, points);
- * // result.data is void* (HIP device pointer), caller must hipFree()
- * @endcode
- *
- * @author Kodo (AI Assistant)
- * @date 2026-02-23
- */
+// ============================================================================
+// FirFilterROCm — GPU FIR-фильтр свёрткой во временной области (ROCm/HIP)
+//
+// ЧТО:    Применяет FIR-фильтр (Finite Impulse Response) к комплексному
+//         multi-channel IQ сигналу [channels × points × complex<float>].
+//         Коэффициенты загружаются один раз через SetCoefficients(), persistent
+//         GPU-буфер переиспользуется между вызовами Process().
+//
+// ЗАЧЕМ:  В ЦОС-пайплайне фильтрация — обязательная стадия (anti-aliasing,
+//         decimation, формирование полосы). FIR гарантирует линейную фазу
+//         (важно для радара), в отличие от IIR. На GPU — параллелизм по
+//         каналам и samples, на больших batch'ах быстрее CPU в 10-50×.
+//
+// ПОЧЕМУ: - hiprtc + GpuContext (Layer 1 Ref03) — kernel компилируется один
+//           раз, lazy через EnsureCompiled(), кешируется на диск.
+//         - Persistent coeff_buf_ — коэффициенты загружаются однократно при
+//           SetCoefficients(); Process() использует уже-выделенный буфер,
+//           не делает hipMalloc/hipFree в hot-path.
+//         - kBlockSize=256 — стандартный warp×4 для RDNA4 (gfx1201): меньше
+//           idle threads, больше register не spill'ит.
+//         - Move-only — coeff_buf_ владеет hipMalloc-памятью, копирование
+//           привело бы к double-free в деструкторе.
+//         - prof_events optional — null = production (zero overhead);
+//           non-null = benchmark, заполняется парами (stage_name, ROCmProfilingData)
+//           через MakeROCmDataFromEvents (см. utils/rocm_profiling_helpers.hpp).
+//
+// Использование:
+//   filters::FirFilterROCm fir(rocm_backend);
+//   fir.SetCoefficients({0.1f, 0.2f, 0.4f, 0.2f, 0.1f});
+//   auto result = fir.Process(gpu_input, channels, points);
+//   // result.data — void* (HIP device pointer), caller обязан hipFree
+//
+// История:
+//   - Создан:  2026-02-23 (ROCm-порт OpenCL FirFilter, namespace filters)
+//   - Изменён: 2026-04-15 (миграция в DSP-GPU/spectrum, GpuContext Ref03)
+// ============================================================================
 
 #if ENABLE_ROCM
 
@@ -44,7 +57,17 @@ namespace filters {
 /// Список событий профилирования ROCm (имя стадии + ROCmProfilingData)
 using ROCmProfEvents = std::vector<std::pair<const char*, drv_gpu_lib::ROCmProfilingData>>;
 
-/// @ingroup grp_filters
+/**
+ * @class FirFilterROCm
+ * @brief GPU FIR-фильтр через свёртку во временной области (multi-channel IQ).
+ *
+ * @note Move-only. Требует #if ENABLE_ROCM (CPU-only сборки получают stub).
+ * @note Coeff-buffer persistent — повторные Process() не делают hipMalloc.
+ * @note Не thread-safe (один экземпляр = один владелец GPU-ресурсов).
+ * @see filters::IirFilterROCm — IIR-альтернатива (рекурсивный фильтр)
+ * @see filters::MovingAverageFilterROCm — упрощённый частный случай
+ * @ingroup grp_filters
+ */
 class FirFilterROCm {
 public:
   explicit FirFilterROCm(drv_gpu_lib::IBackend* backend);
@@ -70,19 +93,20 @@ public:
   // ════════════════════════════════════════════════════════════════════════
 
   /**
-   * @brief Apply FIR filter on GPU (ROCm)
-   * @param input_ptr HIP device pointer with [channels * points] complex float
-   * @param channels Number of parallel channels
-   * @param points Samples per channel
-   * @return InputData<void*> with filtered signal (caller must hipFree result.data)
-   * @note input_ptr is NOT freed by this method
+   * @brief Применить FIR-фильтр на GPU (ROCm).
+   * @param input_ptr   HIP device pointer на [channels × points × complex<float>].
+   * @param channels    Число параллельных каналов.
+   * @param points      Samples на канал.
+   * @param prof_events Опциональный сборщик ROCm-профайл-событий (null = production).
+   * @return InputData<void*> с отфильтрованным сигналом (caller обязан hipFree result.data).
+   * @note input_ptr НЕ освобождается этим методом.
    */
   drv_gpu_lib::InputData<void*> Process(
       void* input_ptr, uint32_t channels, uint32_t points,
       ROCmProfEvents* prof_events = nullptr);
 
   /**
-   * @brief Apply FIR filter from CPU data (upload + process + keep on GPU)
+   * @brief Применить FIR-фильтр к CPU-данным (upload H2D + Process; результат остаётся на GPU).
    */
   drv_gpu_lib::InputData<void*> ProcessFromCPU(
       const std::vector<std::complex<float>>& data,
@@ -90,7 +114,7 @@ public:
       ROCmProfEvents* prof_events = nullptr);
 
   /**
-   * @brief CPU reference implementation (for validation)
+   * @brief CPU-эталон (для валидации GPU-результатов в тестах).
    */
   std::vector<std::complex<float>> ProcessCpu(
       const std::vector<std::complex<float>>& input,

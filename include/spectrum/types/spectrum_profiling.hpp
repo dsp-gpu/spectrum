@@ -2,18 +2,23 @@
 
 /**
  * @file spectrum_profiling.hpp
- * @brief Локальные данные профилирования модуля fft_func (spectrum)
+ * @brief Локальный legacy-формат данных профилирования модуля spectrum (ProfilingData).
  *
- * Для централизованного профилирования (JSON, MD) используется GPUProfiler
- * с OpenCLProfilingData. ProfilingData — локальный формат для GetProfilingData().
+ * @note Тип B (technical header): один POD-struct для GetProfilingData().
+ *       Для централизованного профилирования (JSON / MD / per-stage) — `ProfilingFacade`
+ *       (см. core/services/profiling/profiling_facade.hpp).
  *
- * @author Кодо (AI Assistant)
- * @date 2026-02-15
+ * История:
+ *   - Создан:  2026-02-15
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 namespace antenna_fft {
 
-/// Локальные данные профилирования (время в мс) для GetProfilingData()
+/**
+ * @struct ProfilingData
+ * @brief Локальные данные профилирования (время в мс) для SpectrumProcessor::GetProfilingData().
+ */
 struct ProfilingData {
     double upload_time_ms = 0.0;
     double fft_time_ms = 0.0;

@@ -2,12 +2,15 @@
 
 /**
  * @file mag_phase_types.hpp
- * @brief Types for ComplexToMagPhaseROCm -- direct complex-to-magnitude+phase conversion
+ * @brief Типы для ComplexToMagPhaseROCm — прямая конверсия complex → magnitude+phase.
  *
- * Lighter than FFTMagPhaseResult: no nFFT, sample_rate, frequency (no FFT involved).
+ * @note Тип B (technical header): POD struct'ы для standalone-конвертера (без FFT).
+ *       Легче чем FFTMagPhaseResult: нет nFFT/sample_rate/frequency.
+ * @note norm_coeff: 0=skip (×1), -1=÷n_point (×1/n), >0=multiply by value.
  *
- * @author Kodo (AI Assistant)
- * @date 2026-03-01
+ * История:
+ *   - Создан:  2026-03-01
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 #include <cstdint>
@@ -15,7 +18,10 @@
 
 namespace fft_processor {
 
-/// Parameters for ComplexToMagPhaseROCm conversion
+/**
+ * @struct MagPhaseParams
+ * @brief Параметры ComplexToMagPhaseROCm-конверсии (без FFT).
+ */
 struct MagPhaseParams {
     uint32_t beam_count   = 1;     ///< Number of parallel beams/channels
     uint32_t n_point      = 0;     ///< Points per beam
@@ -23,7 +29,10 @@ struct MagPhaseParams {
     float    norm_coeff   = 1.0f;  ///< Normalization: 0=skip (×1), -1=÷n_point (×1/n), >0=multiply by value
 };
 
-/// Result of complex-to-mag/phase conversion (one per beam)
+/**
+ * @struct MagPhaseResult
+ * @brief Результат complex→mag/phase конверсии (один на луч).
+ */
 struct MagPhaseResult {
     uint32_t beam_id = 0;         ///< Beam index
     uint32_t n_point = 0;         ///< Points in this beam
@@ -31,7 +40,10 @@ struct MagPhaseResult {
     std::vector<float> phase;      ///< arg(z) = atan2(im, re) [radians]
 };
 
-/// Result of magnitude-only conversion (no phase computed)
+/**
+ * @struct MagnitudeResult
+ * @brief Результат magnitude-only конверсии (фаза не считается).
+ */
 struct MagnitudeResult {
     uint32_t beam_id = 0;         ///< Beam index
     uint32_t n_point = 0;         ///< Points in this beam

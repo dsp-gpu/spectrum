@@ -1,39 +1,52 @@
 #pragma once
 
-/**
- * @file complex_to_mag_phase_rocm.hpp
- * @brief ComplexToMagPhaseROCm -- direct complex-to-magnitude+phase conversion on GPU
- *
- * @note НЕ путать с @ref fft_processor::MagPhaseOp (см. operations/mag_phase_op.hpp).
- *       @ref MagPhaseOp — Layer 5 Op (строительный блок, 1 метод Execute),
- *       используется как внутри FFTProcessorROCm, так и внутри этого класса.
- *       А ComplexToMagPhaseROCm — Layer 6 Facade со своим BufferSet/GpuContext,
- *       полноценный публичный API для случая "просто IQ → mag+phase без FFT".
- *
- * Separate class for converting complex IQ data to magnitude+phase pairs.
- * Does NOT perform FFT -- pure mathematical conversion:
- *   magnitude = sqrt(re^2 + im^2)
- *   phase     = atan2(im, re)
- *
- * Supports:
- * - CPU data input (std::vector<complex<float>>)
- * - GPU data input (void* device pointer)
- * - CPU output (std::vector<MagPhaseResult>)
- * - GPU output (void* -- caller owns, must Free)
- * - Batch processing for large datasets (BatchManager)
- *
- * Key differences from FFTProcessorROCm:
- * - No hipFFT dependency (no FFT plan, no padding)
- * - Only 2 GPU buffers (input + output, no fft_input/fft_output)
- * - ProcessToGPU() methods for "stay on GPU" use case
- * - Lighter MagPhaseResult types (no nFFT, sample_rate, frequency)
- *
- * IMPORTANT: This file compiles ONLY with ENABLE_ROCM=1.
- * On Windows (no ROCm) this file is completely skipped.
- *
- * @author Kodo (AI Assistant)
- * @date 2026-03-01
- */
+// ============================================================================
+// ComplexToMagPhaseROCm — Layer 6 Facade прямой конверсии complex → mag+phase
+//
+// ЧТО:    Полноценный публичный API для случая «IQ → magnitude+phase без FFT»:
+//         magnitude = sqrt(re² + im²), phase = atan2(im, re). Поддерживает
+//         4 пути: CPU→CPU, GPU→CPU, CPU→GPU (stay on GPU), GPU→GPU
+//         (zero-copy). Плюс ProcessMagnitude*: только модуль без фазы. Плюс
+//         ProcessMagnitudeToBuffer для in-place записи в чужой буфер
+//         (используется strategies для заполнения d_magnitudes_ после FFT).
+//
+// ЗАЧЕМ:  Бывают сценарии когда нужны mag/phase IQ-данных БЕЗ преобразования
+//         в спектр (например, envelope detection, instantaneous phase для
+//         radar pulse compression). FFTProcessorROCm избыточен: тащит hipFFT,
+//         padding до степени двойки, лишние буферы. Этот класс — лёгкая
+//         альтернатива с тем же architecture style (Ref03 Layer 6).
+//
+// ПОЧЕМУ: - Layer 6 Facade (Ref03): свой GpuContext + BufferSet<3>, владеет
+//           двумя Op'ами Layer 5 (MagPhaseOp, MagnitudeOp). Координирует, не
+//           считает сам — Op'ы делают работу.
+//         - НЕ путать с MagPhaseOp (operations/mag_phase_op.hpp). MagPhaseOp —
+//           Layer 5 Op (строительный блок, 1 Execute), вызывается ВНУТРИ
+//           этого фасада И внутри FFTProcessorROCm. ComplexToMagPhaseROCm —
+//           публичный фасад над ним для самостоятельного use case.
+//         - 4 варианта Process (CPU/GPU input × CPU/GPU output) — типичный
+//           DSP API: иногда данные уже на GPU после предыдущего шага
+//           pipeline'а (zero-copy путь), иногда приходят из Python (CPU).
+//         - ProcessToGPU/ProcessMagnitudeToGPU отдают void* — caller владеет,
+//           обязан backend->Free()/hipFree. Это документировано в каждом
+//           методе, потому что забыть = утечка GPU-памяти.
+//         - Move-only: GPU-ресурсы (BufferSet, GpuContext) уникальны.
+//         - BatchManager — для датасетов больше GPU memory: батчует beam'ы,
+//           каждый батч прогоняет независимо, конкатенирует результат.
+//
+// Использование:
+//   fft_processor::ComplexToMagPhaseROCm proc(backend);
+//   spectrum::MagPhaseParams params{.beam_count=8, .n_point=1024};
+//
+//   // CPU → CPU (одиночный вызов из Python):
+//   auto results = proc.Process(complex_data, params);
+//
+//   // GPU → GPU (внутри pipeline'а после генератора):
+//   void* mag_phase_gpu = proc.ProcessToGPU(gen_output, params);
+//   // ... use mag_phase_gpu ... затем backend->Free(mag_phase_gpu).
+//
+// История:
+//   - Создан: 2026-03-01 (выделение из FFTProcessorROCm для use case без FFT)
+// ============================================================================
 
 #if ENABLE_ROCM
 
@@ -54,6 +67,19 @@
 
 namespace fft_processor {
 
+/**
+ * @class ComplexToMagPhaseROCm
+ * @brief Layer 6 Facade прямой конверсии complex IQ → magnitude+phase (без FFT).
+ *
+ * @note Move-only. Требует #if ENABLE_ROCM.
+ * @note НЕ путать с MagPhaseOp (operations/mag_phase_op.hpp) — это Layer 5
+ *       строительный блок, который данный фасад использует внутри.
+ * @note Все *ToGPU методы возвращают void*, владение передаётся caller'у —
+ *       обязательно вызывать backend->Free()/hipFree, иначе утечка.
+ * @see fft_processor::MagPhaseOp
+ * @see fft_processor::MagnitudeOp
+ * @see fft_processor::FFTProcessorROCm (если нужен FFT перед mag/phase)
+ */
 class ComplexToMagPhaseROCm {
 public:
     // =========================================================================

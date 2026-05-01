@@ -2,14 +2,23 @@
 
 /**
  * @file kaufman_kernels_rocm.hpp
- * @brief HIP kernel source for Kaufman Adaptive Moving Average (KAMA)
+ * @brief HIP kernel-source для Kaufman Adaptive Moving Average (KAMA, адаптивное сглаживание).
  *
- * 1D grid: one thread per channel, sequential loop over points.
- * Ring buffer size = N_WINDOW (er_period), set at hiprtc compile time via -DN_WINDOW=<er_period>.
- * Re and Im parts processed independently.
+ * @note Тип B (technical header): R"HIP(...)HIP" source для hiprtc.
+ *       Kernel: 1D grid, один поток на канал, sequential loop по points.
+ *       Re и Im обрабатываются независимо.
+ * @note Алгоритм:
+ *         ER = |x[n] - x[n-N]| / Σ|x[i] - x[i-1]|, i=n-N+1..n   (Efficiency Ratio)
+ *         SC = (ER·(fast_sc - slow_sc) + slow_sc)²              (Smoothing Constant)
+ *         KAMA[n] = KAMA[n-1] + SC·(x[n] - KAMA[n-1])
+ * @note ⚠️ N_WINDOW = compile-time константа через `-DN_WINDOW=<er_period>` из
+ *       KaufmanFilterROCm::CompileKernel(n_window). НЕ заменять на фиксированное!
+ *       Причина: thread-local массив фикс. размера при BLOCK_SIZE=256 → scratch
+ *       overflow (256 KB/блок) → SIGSEGV на gfx1201 RDNA4.
  *
- * @author Kodo (AI Assistant)
- * @date 2026-03-01
+ * История:
+ *   - Создан:  2026-03-01
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 namespace filters {

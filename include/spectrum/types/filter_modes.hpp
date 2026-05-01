@@ -2,10 +2,14 @@
 
 /**
  * @file filter_modes.hpp
- * @brief Filter processing modes and precision settings
+ * @brief Режимы и точность вычисления фильтров (FilterPrecision, FirAlgorithm).
  *
- * @author Kodo (AI Assistant)
- * @date 2026-02-18
+ * @note Тип B (technical header): только enum'ы, без логики.
+ *       FirAlgorithm::Tiled / OLS_FFT — заглушки на будущее, сейчас работает Direct.
+ *
+ * История:
+ *   - Создан:  2026-02-18
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 namespace filters {

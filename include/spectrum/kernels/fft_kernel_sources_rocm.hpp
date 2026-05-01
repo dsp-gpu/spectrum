@@ -2,29 +2,22 @@
 
 /**
  * @file fft_kernel_sources_rocm.hpp
- * @brief HIP kernel sources for SpectrumProcessorROCm
+ * @brief HIP kernel-source string'и для SpectrumProcessorROCm (FFT pre/post + поиск пиков).
  *
- * Contains:
- * - pad_data: zero-padding n_point -> nFFT for batch FFT (2D grid)
- * - compute_magnitudes: |FFT[i]| = sqrt(re^2 + im^2)
- * - post_kernel_one_peak: ONE_PEAK search with parabolic interpolation
- * - post_kernel_two_peaks: TWO_PEAKS search (left + right independent maxima)
+ * @note Тип B (technical header): R"HIP(...)HIP" sources для hiprtc.
+ *       Состав ядер:
+ *         - pad_data              — zero-padding n_point → nFFT для batch FFT (2D grid)
+ *         - compute_magnitudes    — |FFT[i]| = sqrt(re² + im²)
+ *         - post_kernel_one_peak  — ONE_PEAK + параболическая интерполяция
+ *         - post_kernel_two_peaks — TWO_PEAKS (независимые left + right максимумы)
+ * @note Оптимизации (порт из OpenCL): __launch_bounds__(256), __fsqrt_rn вместо sqrtf,
+ *       tree-reduction O(log2 N) вместо O(N), LDS +1 padding (no bank conflicts),
+ *       2D grid (no div/mod), hipMemsetAsync + early return (no else-branch divergence).
+ * @note Используется собственный float2_t — обходит проблемы hiprtc со встроенными типами.
  *
- * Kernels are compiled at runtime via hiprtc.
- * Uses custom float2_t struct to avoid hiprtc built-in type issues.
- *
- * Ported from fft_kernel_sources.hpp (OpenCL -> HIP).
- *
- * Optimizations ported from OpenCL:
- *   - __launch_bounds__(256) on all kernels
- *   - __fsqrt_rn instead of sqrtf (hardware intrinsic)
- *   - Tree-reduction O(log2(N)) instead of O(N) sequential loop
- *   - LDS +1 padding to avoid bank conflicts
- *   - 2D grid for pad_data (eliminates div/mod)
- *   - hipMemsetAsync + early return (no else-branch divergence)
- *
- * @author Kodo (AI Assistant)
- * @date 2026-02-23
+ * История:
+ *   - Создан:  2026-02-23
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 #if ENABLE_ROCM

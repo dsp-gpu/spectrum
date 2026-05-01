@@ -1,31 +1,39 @@
 #pragma once
 
-/**
- * @file iir_filter_rocm.hpp
- * @brief IirFilterROCm - GPU IIR biquad cascade filter (ROCm/HIP)
- *
- * ROCm port of IirFilter (OpenCL). Same algorithm, HIP runtime:
- * - hiprtc for kernel compilation
- * - void* device pointers instead of cl_mem
- * - hipStream_t instead of cl_command_queue
- *
- * Compiles ONLY with ENABLE_ROCM=1 (Linux + AMD GPU).
- *
- * Usage:
- * @code
- * IirFilterROCm iir(rocm_backend);
- * iir.SetBiquadSections({{0.02f, 0.04f, 0.02f, -1.56f, 0.64f}});
- *
- * auto result = iir.Process(gpu_input, channels, points);
- * // result.data is void* (HIP device pointer), caller must hipFree()
- * @endcode
- *
- * @note GPU IIR is efficient ONLY with many channels (>= 8).
- *       Single-channel IIR is faster on CPU!
- *
- * @author Kodo (AI Assistant)
- * @date 2026-02-23
- */
+// ============================================================================
+// IirFilterROCm — GPU IIR-фильтр каскадом biquad-секций (ROCm/HIP)
+//
+// ЧТО:    Применяет каскад biquad-секций (Second-Order Sections, SOS) к
+//         комплексному multi-channel IQ сигналу. Каждая секция — рекурсивный
+//         фильтр 2-го порядка с 5 коэффициентами {b0, b1, b2, a1, a2}.
+//         SOS-матрица грузится один раз через SetBiquadSections() в persistent
+//         GPU-буфер sos_buf_.
+//
+// ЗАЧЕМ:  Высокопорядковые IIR-фильтры (Butterworth, Chebyshev, Elliptic)
+//         численно нестабильны как один полином — стандартная практика
+//         разбивать на каскад biquad-ов. ROCm-порт нужен для интеграции в
+//         hot-path радар-пайплайна, где CPU IIR на 1024 каналах = bottleneck.
+//
+// ПОЧЕМУ: - GPU IIR эффективен ТОЛЬКО на большом числе каналов (>= 8) —
+//           внутри канала filter рекурсивен (sample[n] зависит от [n-1]),
+//           параллелизм лежит ТОЛЬКО по каналам. На 1 канале CPU быстрее.
+//         - hiprtc + GpuContext (Layer 1 Ref03) — kernel компилируется
+//           один раз, lazy через EnsureCompiled().
+//         - Persistent sos_buf_ — SOS-матрица заливается через
+//           SetBiquadSections(), Process() не аллоцирует.
+//         - kBlockSize=256 — стандарт RDNA4 (gfx1201).
+//         - Move-only — sos_buf_ владеет hipMalloc-памятью.
+//
+// Использование:
+//   filters::IirFilterROCm iir(rocm_backend);
+//   iir.SetBiquadSections({{0.02f, 0.04f, 0.02f, -1.56f, 0.64f}});
+//   auto result = iir.Process(gpu_input, channels, points);
+//   // result.data — void* HIP device pointer, caller обязан hipFree
+//
+// История:
+//   - Создан:  2026-02-23 (ROCm-порт OpenCL IirFilter)
+//   - Изменён: 2026-04-15 (миграция в DSP-GPU/spectrum, GpuContext Ref03)
+// ============================================================================
 
 #if ENABLE_ROCM
 
@@ -47,7 +55,17 @@ namespace filters {
 /// Список событий профилирования ROCm (имя стадии + ROCmProfilingData)
 using ROCmProfEvents = std::vector<std::pair<const char*, drv_gpu_lib::ROCmProfilingData>>;
 
-/// @ingroup grp_filters
+/**
+ * @class IirFilterROCm
+ * @brief GPU IIR-фильтр каскадом biquad-секций (multi-channel IQ).
+ *
+ * @note Move-only. Требует #if ENABLE_ROCM (CPU-only сборки получают stub).
+ * @note Эффективен ТОЛЬКО при channels >= 8 — рекурсия внутри канала, параллелизм по каналам.
+ * @note SOS-буфер persistent — повторные Process() не делают hipMalloc.
+ * @note Не thread-safe (один экземпляр = один владелец GPU-ресурсов).
+ * @see filters::FirFilterROCm — линейная фаза, неэффективен для high-Q
+ * @ingroup grp_filters
+ */
 class IirFilterROCm {
 public:
   explicit IirFilterROCm(drv_gpu_lib::IBackend* backend);
@@ -73,19 +91,20 @@ public:
   // ════════════════════════════════════════════════════════════════════════
 
   /**
-   * @brief Apply IIR biquad cascade on GPU (ROCm)
-   * @param input_ptr HIP device pointer with [channels * points] complex float
-   * @param channels Number of parallel channels
-   * @param points Samples per channel
-   * @return InputData<void*> with filtered signal (caller must hipFree result.data)
-   * @note input_ptr is NOT freed by this method
+   * @brief Применить IIR biquad-каскад на GPU (ROCm).
+   * @param input_ptr   HIP device pointer на [channels × points × complex<float>].
+   * @param channels    Число параллельных каналов (рекомендуется >= 8 для GPU-эффективности).
+   * @param points      Samples на канал.
+   * @param prof_events Опциональный сборщик ROCm-профайл-событий (null = production).
+   * @return InputData<void*> с отфильтрованным сигналом (caller обязан hipFree result.data).
+   * @note input_ptr НЕ освобождается этим методом.
    */
   drv_gpu_lib::InputData<void*> Process(
       void* input_ptr, uint32_t channels, uint32_t points,
       ROCmProfEvents* prof_events = nullptr);
 
   /**
-   * @brief Apply IIR filter from CPU data (upload + process + keep on GPU)
+   * @brief Применить IIR-фильтр к CPU-данным (upload H2D + Process; результат остаётся на GPU).
    */
   drv_gpu_lib::InputData<void*> ProcessFromCPU(
       const std::vector<std::complex<float>>& data,
@@ -93,7 +112,7 @@ public:
       ROCmProfEvents* prof_events = nullptr);
 
   /**
-   * @brief CPU reference implementation (for validation)
+   * @brief CPU-эталон (для валидации GPU-результатов в тестах).
    */
   std::vector<std::complex<float>> ProcessCpu(
       const std::vector<std::complex<float>>& input,

@@ -2,10 +2,14 @@
 
 /**
  * @file spectrum_modes.hpp
- * @brief Режимы поиска пиков (fft_func spectrum)
+ * @brief Режимы поиска пиков спектра: ONE_PEAK / TWO_PEAKS / ALL_MAXIMA.
  *
- * @author Кодо (AI Assistant)
- * @date 2026-02-15
+ * @note Тип B (technical header): только enum, без логики.
+ *       Используется SpectrumMaximaFinder и pipeline'ами AllMaximaPipelineROCm.
+ *
+ * История:
+ *   - Создан:  2026-02-15
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 namespace antenna_fft {

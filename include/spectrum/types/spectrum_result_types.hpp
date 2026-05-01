@@ -2,10 +2,16 @@
 
 /**
  * @file spectrum_result_types.hpp
- * @brief Типы результатов поиска максимумов
+ * @brief Типы результатов поиска максимумов спектра (MaxValue, SpectrumResult, AllMaximaResult).
  *
- * @author Кодо (AI Assistant)
- * @date 2026-02-15
+ * @note Тип B (technical header): POD-struct'ы под GPU-side layout (32 байта с pad).
+ * @note ⚠️ OWNERSHIP в AllMaximaResult: при destination=GPU/ALL caller ОБЯЗАН
+ *       освободить gpu_maxima/gpu_counts (hipFree для ROCm, clReleaseMemObject для OpenCL).
+ *       При destination=CPU указатели == nullptr (освобождены внутри pipeline).
+ *
+ * История:
+ *   - Создан:  2026-02-15
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 #include <core/interface/output_destination.hpp>
@@ -18,8 +24,13 @@ namespace antenna_fft {
 
 using drv_gpu_lib::OutputDestination;
 
-// Один максимум спектра — GPU-side layout compact_maxima/post_kernel, 32 байта с pad.
-// Заполняется post_kernel (ONE/TWO_PEAKS) или compact_kernel (ALL_MAXIMA).
+/**
+ * @struct MaxValue
+ * @brief Один максимум спектра — GPU-side layout (32 байта с pad).
+ *
+ * @note Заполняется post_kernel (ONE/TWO_PEAKS) или compact_kernel (ALL_MAXIMA).
+ *       phase в ГРАДУСАХ (не радианах!), refined_frequency = (index + δ) × fs/nFFT.
+ */
 struct MaxValue {
     uint32_t index;               ///< Бин FFT — позиция в спектре [0, nFFT)
     float real, imag;             ///< Re/Im FFT[index] — для фазового анализа
@@ -31,8 +42,13 @@ struct MaxValue {
     uint32_t pad;                 ///< Выравнивание до 32 байт
 };
 
-// Результат одной антенны/луча (ONE_PEAK или TWO_PEAKS).
-// interpolated — параболически уточнённый пик; left/center/right — соседние бины.
+/**
+ * @struct SpectrumResult
+ * @brief Результат одной антенны/луча (режим ONE_PEAK или TWO_PEAKS).
+ *
+ * @note interpolated — параболически уточнённый пик;
+ *       left/center/right — соседние бины (без интерполяции).
+ */
 struct SpectrumResult {
     uint32_t antenna_id;          ///< Индекс антенны в batch
     MaxValue interpolated;        ///< Главный пик (peak[0]) с параболической интерполяцией
@@ -41,24 +57,36 @@ struct SpectrumResult {
     MaxValue right_point;         ///< FFT[peak_bin + 1] — правый сосед
 };
 
-// Устаревший тип — обёртка над двумя SpectrumResult для совместимости со старым API
+/**
+ * @struct CPUSpectrumResult
+ * @brief Устаревшая обёртка над двумя SpectrumResult — для совместимости со старым API.
+ * @deprecated Использовать SpectrumResult[] напрямую.
+ */
 struct CPUSpectrumResult {
     SpectrumResult SpectrMax_left, SpectrMax_right;
 };
 
-// Все максимумы одного луча (AllMaxima pipeline).
-// num_maxima ≤ max_maxima_per_beam; maxima заполнено compact_kernel'ом.
+/**
+ * @struct AllMaximaBeamResult
+ * @brief Все максимумы одного луча (AllMaxima pipeline).
+ *
+ * @note num_maxima ≤ max_maxima_per_beam; maxima пуст при destination=GPU.
+ */
 struct AllMaximaBeamResult {
     uint32_t antenna_id;            ///< Индекс луча
     uint32_t num_maxima;            ///< Реальное число найденных максимумов (0..max_maxima_per_beam)
     std::vector<MaxValue> maxima;   ///< Результаты (CPU copy); пусто при Dest=GPU
 };
 
-// Выходной контейнер FindAllMaxima/AllMaxima.
-// ⚠️ OWNERSHIP: при destination=GPU или ALL — caller ОБЯЗАН освободить gpu_maxima и gpu_counts!
-//    OpenCL: clReleaseMemObject(static_cast<cl_mem>(result.gpu_maxima))
-//    ROCm:   hipFree(result.gpu_maxima)
-// При destination=CPU — gpu_maxima/gpu_counts == nullptr (освобождены внутри).
+/**
+ * @struct AllMaximaResult
+ * @brief Выходной контейнер FindAllMaxima/AllMaxima pipeline.
+ *
+ * @note ⚠️ OWNERSHIP: при destination=GPU/ALL caller ОБЯЗАН освободить gpu_maxima и gpu_counts!
+ *       OpenCL: clReleaseMemObject(static_cast<cl_mem>(result.gpu_maxima))
+ *       ROCm:   hipFree(result.gpu_maxima)
+ *       При destination=CPU указатели == nullptr (освобождены внутри pipeline).
+ */
 struct AllMaximaResult {
     std::vector<AllMaximaBeamResult> beams;  ///< Результаты по лучам (заполнено при Dest=CPU/ALL)
     OutputDestination destination;

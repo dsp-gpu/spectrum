@@ -2,10 +2,15 @@
 
 /**
  * @file spectrum_params.hpp
- * @brief Параметры поиска максимума спектра
+ * @brief Параметры поиска максимумов спектра (SpectrumParams: antenna_count, n_point, peak_mode).
  *
- * @author Кодо (AI Assistant)
- * @date 2026-02-15
+ * @note Тип B (technical header): POD-struct без логики.
+ *       Поля nFFT и base_fft помечены ВЫЧИСЛЯЕМОЕ — заполняются PrepareParams()
+ *       из InputData<T>, НЕ задаются вручную.
+ *
+ * История:
+ *   - Создан:  2026-02-15
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 #include <spectrum/types/spectrum_modes.hpp>

@@ -1,19 +1,42 @@
 #pragma once
 
-/**
- * @file kaufman_filter_rocm.hpp
- * @brief KaufmanFilterROCm - GPU Kaufman Adaptive Moving Average (ROCm/HIP)
- *
- * KAMA adapts smoothing speed automatically:
- *   Trend signal (ER≈1) → fast reaction
- *   Noise signal (ER≈0) → slow reaction (almost frozen)
- *
- * Grid: 1D — one thread per channel, sequential loop.
- * Ring buffer size = er_period, compiled via hiprtc -DN_WINDOW=<er_period> (lazy, per-N cache).
- *
- * @author Kodo (AI Assistant)
- * @date 2026-03-01
- */
+// ============================================================================
+// KaufmanFilterROCm — GPU Kaufman Adaptive Moving Average (KAMA, ROCm/HIP)
+//
+// ЧТО:    Адаптивное скользящее среднее: автоматически меняет скорость
+//         сглаживания по Efficiency Ratio (ER):
+//           - Trend сигнал (ER≈1) → быстрая реакция (fast EMA = 2/(2+1) = 2/3)
+//           - Noise сигнал (ER≈0) → почти заморожен (slow EMA = 2/(30+1) = 2/31)
+//         SC = (ER × (fast_sc − slow_sc) + slow_sc)². Применяется к Re/Im
+//         комплексного сигнала независимо.
+//
+// ЗАЧЕМ:  В радар-задачах сигнал-шум меняется во времени: на короткой
+//         дистанции SNR высок (видно цель — нужна быстрая реакция), на
+//         дальней — низкий (только шум — нужен почти отрезающий фильтр).
+//         Фиксированный EMA даёт компромисс «всегда чуть-чуть мажет», KAMA
+//         подстраивается per-sample.
+//
+// ПОЧЕМУ: - Per-N kernel cache (compiled_window_size_) — kernel ре-компилится
+//           через hiprtc с -DN_WINDOW=<er_period> при смене er_period.
+//           Внутри ring-buffer фиксированной длины, hot-path не имеет
+//           runtime-проверок длины окна.
+//         - fast_sc_ / slow_sc_ precomputed в SetParams() — не вычислять
+//           2/(N+1) внутри kernel при каждом sample.
+//         - cached_input_buf_ — re-use H2D buffer'а если размер совпал
+//           (избавляет от ~0.5ms hipMalloc/hipFree на каждый ProcessFromCPU).
+//         - Grid 1D, 1 thread = 1 channel — последовательный цикл по
+//           samples внутри канала (рекурсивно, parallelism только по каналам).
+//         - block_size_ конфигурируемый (default 256) — стандарт RDNA4.
+//
+// Использование:
+//   filters::KaufmanFilterROCm kf(rocm_backend);
+//   kf.SetParams(/*er_period=*/10, /*fast=*/2, /*slow=*/30);
+//   auto result = kf.ProcessFromCPU(data, channels, points);
+//
+// История:
+//   - Создан:  2026-03-01 (адаптивный KAMA для radar SNR-aware фильтрации)
+//   - Изменён: 2026-04-15 (миграция в DSP-GPU/spectrum, GpuContext Ref03)
+// ============================================================================
 
 #if ENABLE_ROCM
 
@@ -30,7 +53,18 @@
 
 namespace filters {
 
-/// @ingroup grp_filters
+/**
+ * @class KaufmanFilterROCm
+ * @brief GPU Kaufman Adaptive Moving Average — ER-адаптивное сглаживание.
+ *
+ * @note Move-only. Требует #if ENABLE_ROCM (CPU-only сборки получают stub).
+ * @note Параллелизм только по каналам (рекурсия по времени внутри канала).
+ * @note Per-N kernel cache: смена er_period вызывает recompile через hiprtc.
+ * @note cached_input_buf_ переиспользуется при одинаковых размерах.
+ * @see filters::KalmanFilterROCm — линейный фильтр для тех же задач
+ * @see filters::MovingAverageFilterROCm — простое EMA без адаптации
+ * @ingroup grp_filters
+ */
 class KaufmanFilterROCm {
 public:
   explicit KaufmanFilterROCm(drv_gpu_lib::IBackend* backend,

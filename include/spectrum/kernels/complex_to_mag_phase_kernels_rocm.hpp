@@ -2,18 +2,20 @@
 
 /**
  * @file complex_to_mag_phase_kernels_rocm.hpp
- * @brief Standalone HIP kernel source for complex-to-magnitude+phase conversion
+ * @brief Standalone HIP kernel-source для прямой конверсии complex → magnitude+phase.
  *
- * Separated from fft_processor_kernels_rocm.hpp for:
- * - No pad_data kernel compiled (not needed for direct conversion)
- * - Independent HSACO disk cache key ("c2mp_kernels")
- * - Clean separation of concerns
+ * @note Тип B (technical header): R"HIP(...)HIP" source для hiprtc.
+ *       Каждый поток обрабатывает один элемент, output interleaved float2_t {mag, phase}.
+ * @note Вынесено из fft_processor_kernels_rocm.hpp ради:
+ *         - не компилировать лишний pad_data (не нужен при direct-конверсии)
+ *         - независимый HSACO disk-cache key ("c2mp_kernels")
+ *         - чистое разделение ответственности
+ * @note Используется собственный float2_t (а не hipFloat2) — обходит проблемы hiprtc
+ *       со встроенными типами при динамической компиляции.
  *
- * Kernel compiled at runtime via hiprtc.
- * Uses custom float2_t struct to avoid hiprtc built-in type issues.
- *
- * @author Kodo (AI Assistant)
- * @date 2026-03-01
+ * История:
+ *   - Создан:  2026-03-01
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 #if ENABLE_ROCM

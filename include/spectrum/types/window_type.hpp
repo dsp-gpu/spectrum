@@ -2,22 +2,20 @@
 
 /**
  * @file window_type.hpp
- * @brief Window function types для FFT pre-processing (Hann, Hamming, Blackman).
+ * @brief Типы оконных функций для FFT pre-processing (Hann, Hamming, Blackman).
  *
- * Применяется в PadDataOp перед zero-padding для подавления sinc sidelobes
- * спектра конечного сигнала. Default WindowType::None = rectangular
- * (существующее поведение).
+ * @note Тип B (technical header): только enum.
+ *       Применяется в PadDataOp ДО zero-padding для подавления sinc sidelobes.
+ *       Default None = rectangular (legacy path, без изменений поведения).
+ * @note Калибровка SNR-estimator (PyPanelAntennas/SNR/REPORT.md, 2026-04-09):
+ *         - None     → −27 dB bias (sinc sidelobes −13 dB) ❌
+ *         - Hann     → sidelobes −32 dB
+ *         - Hamming  → sidelobes −43 dB (выше processing loss)
+ *         - Blackman → sidelobes −58 dB (макс. loss)
  *
- * Калибровано Python моделью SNR-estimator (2026-04-09):
- *   - rect (None)  даёт катастрофический −27 dB bias (sinc sidelobes −13 dB)
- *   - Hann         решает проблему (sidelobes −32 dB)
- *   - Hamming      сильнее (−43 dB), но больше processing loss
- *   - Blackman     самый мягкий (−58 dB), максимальный loss
- *
- * Источник: PyPanelAntennas/SNR/REPORT.md
- *
- * @author Kodo (AI Assistant)
- * @date 2026-04-09
+ * История:
+ *   - Создан:  2026-04-09
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 #include <cstdint>

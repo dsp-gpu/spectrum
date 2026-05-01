@@ -2,10 +2,14 @@
 
 /**
  * @file fft_params.hpp
- * @brief Параметры FFTProcessor
+ * @brief Параметры FFTProcessor — конфиг batch-FFT (beam_count, n_point, mode, padding).
  *
- * @author Кодо (AI Assistant)
- * @date 2026-02-15
+ * @note Тип B (technical header): POD-struct без логики, только default'ы.
+ *       Валидация (n_point > 0, repeat_count >= 1) — в FFTProcessor::Initialize().
+ *
+ * История:
+ *   - Создан:  2026-02-15
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 #include <spectrum/types/fft_modes.hpp>
@@ -14,6 +18,13 @@
 
 namespace fft_processor {
 
+/**
+ * @struct FFTProcessorParams
+ * @brief Конфиг FFTProcessor (batch FFT с zero-padding и опциональным окном).
+ *
+ * @note nFFT = nextPow2(n_point) × repeat_count — вычисляется внутри FFTProcessor.
+ *       memory_limit ограничивает один батч (BatchManager делит лучи).
+ */
 struct FFTProcessorParams {
     uint32_t beam_count = 1;   ///< Количество параллельных лучей; каждый луч — один независимый FFT
     uint32_t n_point = 0;      ///< Число реальных точек на луч (до zero-padding).

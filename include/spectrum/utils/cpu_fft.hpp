@@ -1,23 +1,41 @@
 #pragma once
 
-/**
- * @file cpu_fft.hpp
- * @brief CpuFFT — CPU-reference FFT через pocketfft (header-only)
- *
- * Простая обёртка над pocketfft для:
- *   1. Валидации GPU-результатов в тестах (GPU vs CPU)
- *   2. Fallback для отладки (без GPU)
- *
- * Два режима:
- *   - C2C (complex-to-complex): вход complex<float>, выход complex<float>, размер N
- *   - R2C (real-to-complex):    вход float, выход complex<float>, размер N/2+1
- *
- * @note pocketfft: BSD license, header-only, Max-Planck-Society
- * @see third_party/pocketfft/pocketfft_hdronly.h
- *
- * @author Кодо (AI Assistant)
- * @date 2026-04-16
- */
+// ============================================================================
+// CpuFFT — CPU-эталон FFT через pocketfft (header-only, для тестов)
+//
+// ЧТО:    Статический класс-обёртка над pocketfft с 4 операциями: ForwardC2C,
+//         InverseC2C, ForwardR2C (half-spectrum N/2+1), ForwardR2C_Full
+//         (с эрмитовой симметрией — совместимо с hipFFT C2C output) +
+//         Magnitude (|X[k]| или |X[k]|² по флагу squared).
+//
+// ЗАЧЕМ:  GPU-реализации FFT (FFTProcessorROCm) нуждаются в reference
+//         для unit-тестов (GPU vs CPU sanity checks) и в fallback'е для
+//         отладки на машинах без GPU. Без CPU-эталона тесты могли бы
+//         только проверять, что GPU не падает — не корректность.
+//
+// ПОЧЕМУ: - pocketfft (BSD, Max-Planck-Society) — header-only, без зависимостей,
+//           проверенная численная корректность (используется в SciPy).
+//         - POCKETFFT_NO_MULTITHREADING — выключаем threads: используется в
+//           тестах, один поток достаточен и убирает зависимость от <thread>.
+//         - Все методы static → не нужен instance, можно вызывать как
+//           CpuFFT::ForwardC2C(input). Класс — только namespace-прикрытие.
+//         - InverseC2C нормализует на 1/N (как hipFFT с inverse_normalize=true);
+//           ForwardC2C — без нормализации (стандарт FFTW).
+//         - ForwardR2C_Full — отдельно от ForwardR2C: hipFFT в C2C-режиме
+//           выдаёт полный спектр N точек, и для прямого сравнения нужно
+//           CPU достроить отрицательные частоты через conj.
+//
+// Использование:
+//   #include <spectrum/utils/cpu_fft.hpp>
+//   using spectrum_utils::CpuFFT;
+//
+//   auto spectrum = CpuFFT::ForwardC2C(signal);          // complex → complex
+//   auto magnitude = CpuFFT::Magnitude(spectrum, false); // |X[k]|
+//   auto recovered = CpuFFT::InverseC2C(spectrum);       // обратный FFT
+//
+// История:
+//   - Создан: 2026-04-16 (унификация CPU-reference для всех тестов spectrum)
+// ============================================================================
 
 #include <complex>
 #include <vector>

@@ -2,13 +2,7 @@
 
 /**
  * @file spectrum_input_data.hpp
- * @brief Обёртка над DrvGPU/interface — InputData, OutputDestination, type traits
- *
- * Реальные типы в DrvGPU/interface. Здесь — re-export для antenna_fft.
- * DriverType заменён на drv_gpu_lib::BackendType.
- *
- * @author Кодо (AI Assistant)
- * @date 2026-02-15
+ * @brief Re-export типов core/interface (InputData, OutputDestination, traits) в namespace antenna_fft.
  */
 
 #include <core/interface/input_data.hpp>

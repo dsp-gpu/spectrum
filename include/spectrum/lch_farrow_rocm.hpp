@@ -1,19 +1,46 @@
 #pragma once
 
-/**
- * @file lch_farrow_rocm.hpp
- * @brief LchFarrowROCm - Lagrange interpolation fractional delay processor (ROCm/HIP)
- *
- * ROCm port of LchFarrow (OpenCL). Same algorithm, HIP runtime:
- * - hiprtc for kernel compilation
- * - void* device pointers instead of cl_mem
- * - hipStream_t instead of cl_command_queue
- *
- * Compiles ONLY with ENABLE_ROCM=1 (Linux + AMD GPU).
- *
- * @author Kodo (AI Assistant)
- * @date 2026-02-23
- */
+// ============================================================================
+// LchFarrowROCm — fractional-delay интерполятор Лагранжа 48×5 (ROCm/HIP)
+//
+// ЧТО:    ROCm-порт OpenCL-варианта LchFarrow. Тот же алгоритм (5-точечная
+//         интерполяция Лагранжа, матрица 48×5), но через HIP runtime:
+//         hipModule + hipStream + void* device pointers вместо cl_program +
+//         cl_command_queue + cl_mem. Plus ProcessFromCPU (загрузка + обработка
+//         за один вызов) как удобство для Python-биндингов.
+//
+// ЗАЧЕМ:  Main-ветка DSP-GPU работает на Linux + AMD + ROCm 7.2+ (правило
+//         09-rocm-only). LchFarrow (OpenCL) — legacy nvidia-ветки, не работает
+//         на RDNA4. LchFarrowROCm — production-вариант для всех современных
+//         AMD GPU. API специально совместим с LchFarrow для лёгкой замены.
+//
+// ПОЧЕМУ: - GpuContext (Layer 1 Ref03) → переиспользует skомpiled module
+//           через KernelCacheService между вызовами Process. EnsureCompiled
+//           делает hipModuleLoad один раз, дальше hot-path без overhead.
+//         - Move-only (deleted copy) — GPU-ресурсы (matrix_buf_, delay_buf_,
+//           hipModule_t) уникальны на инстанс.
+//         - kBlockSize=256 — оптимум для warp=64 на RDNA4 (правило 13).
+//         - Stub-секция #else (Windows без ROCm) — все методы throw, так что
+//           код, инклюдящий этот заголовок, компилируется кросс-платформенно
+//           (только бросает в runtime). Это для Python-биндингов: одна сборка.
+//         - Read-only profiling: ROCmProfEvents — лист пар (имя, ROCmProfilingData),
+//           caller передаёт указатель если нужно профилирование, иначе
+//           nullptr → zero overhead (без замеров hipEvent).
+//
+// Использование:
+//   lch_farrow::LchFarrowROCm processor(rocm_backend);
+//   processor.SetDelays({0.0f, 1.5f, 3.0f});
+//   processor.SetSampleRate(1e6f);
+//
+//   auto result = processor.Process(gpu_input, antennas, points);
+//   // result.data — void* (HIP device pointer); caller вызывает hipFree.
+//
+//   // Или одним вызовом из CPU:
+//   auto result = processor.ProcessFromCPU(cpu_data, antennas, points);
+//
+// История:
+//   - Создан: 2026-02-23 (порт OpenCL-варианта на ROCm для main-ветки)
+// ============================================================================
 
 #if ENABLE_ROCM
 
@@ -39,21 +66,13 @@ using ROCmProfEvents =
 
 /**
  * @class LchFarrowROCm
- * @brief ROCm/HIP fractional delay processor (Lagrange 48x5)
+ * @brief ROCm/HIP fractional-delay процессор (Lagrange 48×5).
  *
- * Same API as LchFarrow (OpenCL) but for ROCm backend:
- * - Process() returns InputData<void*> (device pointer)
- * - ProcessCpu() is identical (CPU reference)
- *
- * @code
- * LchFarrowROCm processor(rocm_backend);
- * processor.SetDelays({0.0f, 1.5f, 3.0f});
- * processor.SetSampleRate(1e6f);
- *
- * auto result = processor.Process(gpu_input, antennas, points);
- * // result.data is void* (HIP device pointer)
- * @endcode
- *
+ * @note Move-only: GPU-ресурсы уникальны.
+ * @note Требует #if ENABLE_ROCM. На non-ROCm платформах — stub (см. ниже).
+ * @note API совместим с lch_farrow::LchFarrow для прозрачной замены backend'а.
+ * @see lch_farrow::LchFarrow (legacy OpenCL)
+ * @see drv_gpu_lib::GpuContext (Layer 1 Ref03)
  * @ingroup grp_lch_farrow
  */
 class LchFarrowROCm {

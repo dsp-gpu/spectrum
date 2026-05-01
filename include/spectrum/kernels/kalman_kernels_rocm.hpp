@@ -2,13 +2,18 @@
 
 /**
  * @file kalman_kernels_rocm.hpp
- * @brief HIP kernel source for 1D scalar Kalman filter
+ * @brief HIP kernel-source для 1D скалярного фильтра Калмана (constant-state, Re/Im независимо).
  *
- * 1D grid: one thread per channel, sequential predict-update loop.
- * Re and Im parts are filtered independently by two scalar Kalman filters.
+ * @note Тип B (technical header): R"HIP(...)HIP" source для hiprtc.
+ *       Kernel: 1D grid, один поток на канал, sequential predict-update loop.
+ *       Re и Im части обрабатываются двумя независимыми scalar Kalman фильтрами.
+ * @note Модель: constant-state (x_pred = x_hat). Параметры — KalmanParams (Q, R, x0, P0).
+ * @note Оптимизации: __frcp_rn() для fast reciprocal (~2× быстрее full division),
+ *       K = P_pred·rcp(P_pred + R) — single FMA-friendly operation.
  *
- * @author Kodo (AI Assistant)
- * @date 2026-03-01
+ * История:
+ *   - Создан:  2026-03-01
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 namespace filters {

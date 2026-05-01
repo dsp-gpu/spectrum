@@ -2,14 +2,25 @@
 
 /**
  * @file fft_modes.hpp
- * @brief Режимы вывода FFT
+ * @brief Режимы вывода FFTProcessor: COMPLEX / MAGNITUDE_PHASE / MAGNITUDE_PHASE_FREQ.
  *
- * @author Кодо (AI Assistant)
- * @date 2026-02-15
+ * @note Тип B (technical header): только enum, без логики.
+ *       Семантика каждого режима — в комментариях значений.
+ *
+ * История:
+ *   - Создан:  2026-02-15
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 namespace fft_processor {
 
+/**
+ * @enum FFTOutputMode
+ * @brief Формат возвращаемых FFTProcessor данных.
+ *
+ * @note От режима зависит набор kernel'ов на post-stage и тип результата
+ *       (FFTComplexResult vs FFTMagPhaseResult).
+ */
 enum class FFTOutputMode {
     COMPLEX,             ///< Возвращает complex<float>[nFFT] — сырой FFT-спектр (re + im).
                          ///< Нормализация: результат совместим с np.fft.fft() (без деления на N)

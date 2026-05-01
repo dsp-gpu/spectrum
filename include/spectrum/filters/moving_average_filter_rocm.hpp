@@ -1,16 +1,40 @@
 #pragma once
 
-/**
- * @file moving_average_filter_rocm.hpp
- * @brief MovingAverageFilterROCm - GPU moving average filters (ROCm/HIP)
- *
- * Supports: SMA, EMA, MMA, DEMA, TEMA
- * Input: complex<float> (float2_t) — multi-channel IQ signals
- * Grid: 1D — one thread per channel, sequential loop over points
- *
- * @author Kodo (AI Assistant)
- * @date 2026-03-01
- */
+// ============================================================================
+// MovingAverageFilterROCm — GPU скользящие средние (ROCm/HIP)
+//
+// ЧТО:    Семейство скользящих средних на GPU: SMA, EMA, MMA, DEMA, TEMA.
+//         Применяется к комплексному multi-channel IQ сигналу
+//         [channels × points × complex<float>]. Тип фильтра выбирается через
+//         SetParams(MAType, window_size).
+//
+// ЗАЧЕМ:  Базовый строительный блок ЦОС: сглаживание, denoising, тренд-detection.
+//         GPU-версия нужна для multi-channel радара (1024+ каналов параллельно)
+//         где CPU становится bottleneck'ом. Поддержка нескольких типов в одном
+//         классе — вместо плодить FirFilter под каждый MA.
+//
+// ПОЧЕМУ: - Один класс на 5 типов MA (а не 5 классов) — у них одинаковый
+//           pipeline (input → kernel → output), отличается только формула
+//           внутри kernel. Выбор kernel host-side по MAType (zero overhead).
+//         - alpha_ precomputed в SetParams() — для EMA = 2/(N+1), MMA = 1/N;
+//           внутри kernel — простое умножение без деления.
+//         - SMA window ограничен 128 — больше требует ring-buffer в shared
+//           memory, превышает доступный объём для batch_size=256.
+//         - compiled_sma_window_ — re-compile kernel через hiprtc при смене
+//           window_size для SMA (template parameter N_WINDOW).
+//         - cached_input_buf_ — re-use H2D buffer (избавляет от ~0.5ms
+//           hipMalloc/hipFree на каждый ProcessFromCPU).
+//         - Grid 1D, 1 thread = 1 channel — рекурсивный pass по samples.
+//
+// Использование:
+//   filters::MovingAverageFilterROCm ma(rocm_backend);
+//   ma.SetParams(MAType::EMA, /*window_size=*/10);
+//   auto result = ma.ProcessFromCPU(data, channels, points);
+//
+// История:
+//   - Создан:  2026-03-01 (5 типов MA в одном классе)
+//   - Изменён: 2026-04-15 (миграция в DSP-GPU/spectrum, GpuContext Ref03)
+// ============================================================================
 
 #if ENABLE_ROCM
 
@@ -27,7 +51,18 @@
 
 namespace filters {
 
-/// @ingroup grp_filters
+/**
+ * @class MovingAverageFilterROCm
+ * @brief GPU скользящие средние: SMA / EMA / MMA / DEMA / TEMA в одном классе.
+ *
+ * @note Move-only. Требует #if ENABLE_ROCM (CPU-only сборки получают stub).
+ * @note Параллелизм только по каналам (рекурсия по времени внутри канала).
+ * @note SMA: max window_size = 128 (shared memory limit).
+ * @note Per-N kernel cache для SMA: смена window_size вызывает recompile.
+ * @note cached_input_buf_ переиспользуется при одинаковых размерах.
+ * @see filters::KaufmanFilterROCm — адаптивная альтернатива (KAMA)
+ * @ingroup grp_filters
+ */
 class MovingAverageFilterROCm {
 public:
   explicit MovingAverageFilterROCm(drv_gpu_lib::IBackend* backend,

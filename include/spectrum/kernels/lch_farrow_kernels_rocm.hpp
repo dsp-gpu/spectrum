@@ -2,16 +2,23 @@
 
 /**
  * @file lch_farrow_kernels_rocm.hpp
- * @brief HIP kernel source for LchFarrowROCm (fractional delay, Lagrange 48x5)
+ * @brief HIP kernel-source для LchFarrowROCm — fractional delay через Lagrange 48×5 + Philox PRNG.
  *
- * Contains:
- * - Philox-2x32-10 PRNG (counter-based, HIP-compatible)
- * - lch_farrow_delay kernel: fractional delay + optional Gaussian noise
+ * @note Тип B (technical header): R"HIP(...)HIP" source для hiprtc.
+ *       Алгоритм fractional-delay (drop-sample correction):
+ *         read_pos = sample_id - delay_us[antenna] · 1e-6 · sample_rate
+ *         center   = floor(read_pos), frac = read_pos - center
+ *         row      = (uint)(frac · 48) % 48
+ *         output[n] = Σ L[row][k] · input[center-1+k], k=0..4
+ * @note Состав:
+ *         - Philox-2x32-10 PRNG (counter-based, HIP-compatible) для опционального Gaussian noise
+ *         - lch_farrow_delay kernel: fractional delay + optional noise injection
+ * @note ⚠️ delay_us — МИКРОСЕКУНДЫ (per-antenna), API контракт со стороны Python-слоя.
+ *       Lagrange-матрица 48×5=240 floats — задаётся таблицей в host-коде.
  *
- * Kernels compiled at runtime via hiprtc.
- *
- * @author Kodo (AI Assistant)
- * @date 2026-02-23
+ * История:
+ *   - Создан:  2026-02-23
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 #if ENABLE_ROCM

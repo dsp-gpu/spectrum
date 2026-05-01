@@ -1,21 +1,44 @@
 #pragma once
 
-/**
- * @file pad_data_op.hpp
- * @brief PadDataOp — zero-padding kernel for FFT input (+ optional window function)
- *
- * Ref03 Layer 5: Concrete Operation.
- * Extracted from FFTProcessorROCm::ExecutePadKernel().
- *
- * Pipeline: memset(fft_input, 0) + (pad_data OR pad_data_windowed) kernel
- *
- * Kernels:
- *   - pad_data           — copies n_point samples per beam, rest already zeroed.
- *   - pad_data_windowed  — SNR_02b: pad + inline Hann/Hamming/Blackman window.
- *
- * @author Kodo (AI Assistant)
- * @date 2026-03-14 (v1), 2026-04-09 (v2 — SNR_02b window param)
- */
+// ============================================================================
+// PadDataOp — zero-padding входа FFT с опциональным window-function (Layer 5 Ref03)
+//
+// ЧТО:    Concrete Op: копирует n_point samples per beam в буфер размера nFFT
+//         (степень двойки, требование hipFFT), остальное забивает нулями.
+//         Опционально применяет inline window function (Hann/Hamming/Blackman)
+//         в одном проходе — экономит second pass через memory.
+//         Pipeline: hipMemsetAsync(fft_input, 0) + kernel pad_data[_windowed].
+//
+// ЗАЧЕМ:  hipFFT требует размер power-of-2; реальные радар-данные
+//         (n_point=например 1100) нужно дополнить нулями до nFFT=2048.
+//         Без windowing (rectangular) появляются sinc-sidelobes — для SNR
+//         estimator это даёт смещение −27 dB, что критично. Inline window
+//         в pad-kernel исправляет это без второго прохода.
+//
+// ПОЧЕМУ: - Layer 5 Ref03: один Op = один kernel-launch (плюс memset). Выбор
+//           между pad_data и pad_data_windowed — host-side по WindowType.
+//         - Default WindowType::None → старый kernel pad_data, legacy API
+//           не ломается (важно для существующих тестов).
+//         - hipMemsetAsync ВСЕГДА перед pad-kernel — если n_point < nFFT,
+//           «хвост» должен быть строго zero. Делать через kernel дольше, чем
+//           через DMA-style memset.
+//         - 2D grid: X — n_point samples, Y — beam_id. block_x=256.
+//         - Без BufferSet — Op stateless.
+//         - Throws std::runtime_error если memset или kernel launch упал.
+//
+// Использование:
+//   fft_processor::PadDataOp pad_op;
+//   pad_op.Initialize(ctx);
+//   // Старый API (rectangular window):
+//   pad_op.Execute(input_buf, fft_input_buf, beam_count, n_point, nFFT);
+//   // С Hann window для SNR-estimator:
+//   pad_op.Execute(input_buf, fft_input_buf, beam_count, n_point, nFFT,
+//                  WindowType::Hann);
+//
+// История:
+//   - Создан:  2026-03-14 (Ref03 Layer 5, выделено из FFTProcessorROCm)
+//   - Изменён: 2026-04-09 (SNR_02b: добавлен window-параметр для pad_data_windowed)
+// ============================================================================
 
 #if ENABLE_ROCM
 
@@ -29,21 +52,32 @@
 
 namespace fft_processor {
 
+/**
+ * @class PadDataOp
+ * @brief Layer 5 Ref03 Op: zero-pad n_point → nFFT (+ опциональный window function).
+ *
+ * @note Stateless (наследует ctx_/kernel из GpuKernelOp).
+ * @note Требует #if ENABLE_ROCM.
+ * @note Default window=None = rectangular (legacy behavior).
+ * @note Hann/Hamming/Blackman — нужны для SNR-estimator (без них sinc-bias −27 dB).
+ * @see drv_gpu_lib::GpuKernelOp — базовый Layer 3 Ref03
+ * @see antenna_fft::SpectrumPadOp — аналогичный Op в namespace antenna_fft (с beam_offset)
+ */
 class PadDataOp : public drv_gpu_lib::GpuKernelOp {
 public:
   const char* Name() const override { return "PadData"; }
 
   /**
-   * @brief Execute zero-padding (+ optional window): input_buf → fft_input_buf
-   * @param input_buf     Device pointer to raw input [beam_count × n_point × complex]
-   * @param fft_input_buf Device pointer to padded output [beam_count × nFFT × complex]
-   * @param beam_count    Number of beams in this batch
-   * @param n_point       Samples per beam (before padding)
-   * @param nFFT          FFT size (after padding, power of 2)
-   * @param window        Window function (default None = rectangular, legacy behavior)
+   * @brief Zero-padding (+ optional window): input_buf → fft_input_buf.
+   * @param input_buf     Device pointer на raw input [beam_count × n_point × complex<float>].
+   * @param fft_input_buf Device pointer на padded output [beam_count × nFFT × complex<float>].
+   * @param beam_count    Число beams в текущем batch'е.
+   * @param n_point       Samples на beam (до padding'а).
+   * @param nFFT          Размер FFT (после padding'а, степень двойки).
+   * @param window        Window function (default None = rectangular, legacy).
    *
-   * Default WindowType::None → вызывает старый kernel `pad_data` (идентично прежнему API).
-   * Для SNR-estimator передаётся WindowType::Hann — решает sinc sidelobes (−27 dB bias!).
+   * Default WindowType::None → старый kernel `pad_data` (legacy API не ломается).
+   * Для SNR-estimator — WindowType::Hann: убирает sinc sidelobes (−27 dB bias!).
    */
   void Execute(void* input_buf, void* fft_input_buf,
                size_t beam_count, uint32_t n_point, uint32_t nFFT,

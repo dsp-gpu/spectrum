@@ -2,20 +2,22 @@
 
 /**
  * @file fft_processor_kernels_rocm.hpp
- * @brief HIP kernel sources for FFTProcessorROCm
+ * @brief HIP kernel-source string'и FFTProcessorROCm (high-level: pad/window + post-conversion).
  *
- * Contains:
- * - pad_data:                  n_point -> nFFT zero-padding for batch FFT
- * - pad_data_windowed:         pad + window function (Hann/Hamming/Blackman) — SNR_02b
- * - complex_to_mag_phase:      FFT output -> interleaved {magnitude, phase}
- * - complex_to_magnitude:      FFT output -> |X| * inv_n  (for ProcessMagnitudesToGPU)
- * - complex_to_magnitude_squared: FFT output -> (re²+im²) * inv_n (SNR_02, 7× faster)
+ * @note Тип B (technical header): R"HIP(...)HIP" sources для hiprtc.
+ *       Все ядра в ОДНОМ source — компилируются одним hiprtc-вызовом через
+ *       GpuContext::CompileModule() (минимизирует количество HSACO-кэшей).
+ * @note Состав ядер:
+ *         - pad_data                     — n_point → nFFT zero-padding (batch FFT)
+ *         - pad_data_windowed            — pad + window (Hann/Hamming/Blackman), SNR_02b
+ *         - complex_to_mag_phase         — FFT out → interleaved {mag, phase}
+ *         - complex_to_magnitude         — FFT out → |X|·inv_n (ProcessMagnitudesToGPU)
+ *         - complex_to_magnitude_squared — FFT out → (re²+im²)·inv_n (SNR_02, ~7× быстрее)
  *
- * Kernels are compiled at runtime via hiprtc.
- * Uses custom float2_t struct to avoid hiprtc built-in type issues.
- *
- * @author Kodo (AI Assistant)
- * @date 2026-02-23 (v1), 2026-04-09 (v2 — SNR_02, SNR_02b: squared + window)
+ * История:
+ *   - Создан:  2026-02-23
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер;
+ *              ранее v2 2026-04-09 добавил SNR_02 squared + SNR_02b window)
  */
 
 #if ENABLE_ROCM

@@ -2,27 +2,21 @@
 
 /**
  * @file all_maxima_kernel_sources_rocm.hpp
- * @brief HIP kernel sources for AllMaximaPipelineROCm
+ * @brief HIP kernel-source string'и для AllMaximaPipelineROCm (поиск всех максимумов спектра).
  *
- * Pipeline: Detection -> Prefix Sum (Blelloch Scan) -> Stream Compaction
+ * @note Тип B (technical header): R"HIP(...)HIP" sources для hiprtc.
+ *       Pipeline трёх стадий: Detection → Prefix Sum (Blelloch Scan) → Stream Compaction.
+ * @note Состав ядер:
+ *         - detect_all_maxima  — пометка локальных максимумов (2D grid, без div/mod)
+ *         - block_scan         — Blelloch work-efficient exclusive scan (beam-aware)
+ *         - block_add          — добавление scanned block sums (2D grid)
+ *         - compact_maxima     — stream compaction → MaxValue[] (2D grid)
+ * @note Оптимизации (порт из OpenCL): __launch_bounds__(256), __restrict__,
+ *       INV_PI_DEG (multiply вместо divide), +1 LDS padding для bank-conflict free.
  *
- * Contains:
- * - detect_all_maxima: mark local maxima (2D grid, no div/mod)
- * - block_scan: Blelloch work-efficient exclusive scan (beam-aware)
- * - block_add: add scanned block sums to each element (2D grid)
- * - compact_maxima: stream compaction -> MaxValue[] (2D grid)
- *
- * Ported from all_maxima_kernel_sources.hpp (OpenCL -> HIP).
- *
- * Optimizations ported from OpenCL:
- *   - __launch_bounds__(256) on all kernels
- *   - 2D grid for detect/block_add/compact (eliminates div/mod)
- *   - __restrict__ on all pointer params
- *   - INV_PI_DEG constant (multiply instead of divide)
- *   - +1 LDS padding in block_scan (via dispatch shared_mem_size)
- *
- * @author Kodo (AI Assistant)
- * @date 2026-02-23
+ * История:
+ *   - Создан:  2026-02-23
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 #if ENABLE_ROCM

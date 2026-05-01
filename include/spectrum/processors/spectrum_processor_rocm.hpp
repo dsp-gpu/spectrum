@@ -1,20 +1,56 @@
 #pragma once
 
-/**
- * @file spectrum_processor_rocm.hpp
- * @brief ROCm/HIP implementation of ISpectrumProcessor (hipFFT + hiprtc kernels)
- *
- * Strategy pattern - ROCm backend for spectrum maxima finding.
- * HIP implementation:
- * - hipFFT (no pre-callback → separate pad kernel)
- * - hiprtc-compiled kernels for padding, magnitudes, post-processing
- * - AllMaximaPipelineROCm for FindAllMaxima
- *
- * Compiles ONLY with ENABLE_ROCM=1 (Linux + AMD GPU).
- *
- * @author Kodo (AI Assistant)
- * @date 2026-02-23
- */
+// ============================================================================
+// SpectrumProcessorROCm — главный ROCm-фасад модуля spectrum (Layer 6 Ref03)
+//
+// ЧТО:    Реализация ISpectrumProcessor: координирует весь pipeline спектральной
+//         обработки на ROCm — pad → hipFFT → post-kernel → readback. Содержит
+//         3 Layer-5 Op'а (SpectrumPadOp, ComputeMagnitudesOp, SpectrumPostOp)
+//         и AllMaximaPipelineROCm для полного FindAllMaxima сценария.
+//         Поддерживает и Process (top-1/top-2 пиков), и AllMaxima (все пики).
+//
+// ЗАЧЕМ:  Это публичный API модуля spectrum — Python-биндинги и фасад
+//         SpectrumMaximaFinder работают через интерфейс ISpectrumProcessor*,
+//         выбирая SpectrumProcessorROCm через Factory. Один класс координирует
+//         все стадии: фасад потребителю (Python/тесты), оркестратор внутри
+//         (Ref03 Layer 6, держит Op'ы и pipeline).
+//
+// ПОЧЕМУ: - Layer 6 Ref03 (Facade) — НЕ делает kernel-launch'и сам, делегирует
+//           Op'ам через unique_ptr/value-членов (pad_op_, mag_op_, post_op_).
+//           Pipeline для AllMaxima — отдельный класс через unique_ptr.
+//         - 2 hipFFT plan'а (plan_ + allmax_plan_) — Process использует pre-
+//           callback path для скорости, AllMaxima требует «raw» FFT с
+//           отдельным pad-kernel'ом. Разные plan'ы избегают рекомпиляции.
+//         - Buffer-pool (input_buffer_, fft_input_, fft_output_, ...) с lazy
+//           аллокацией и переиспользованием. ReallocateBuffersForBatch
+//           меняет размер только когда batch_count изменился (избегает
+//           hipFree+hipMalloc на каждый Process).
+//         - Move запрещён (=delete) — owns hipFFT plans, kernel modules,
+//           несколько device buffer'ов; копирование = chaos с lifetime.
+//         - GpuContext ctx_ (Ref03 Layer 1) — единая точка для kernel
+//           compile/cache; все Op'ы используют один ctx через Initialize().
+//         - Магнитуды (magnitudes_buffer_) — лениво аллоцируется через
+//           EnsureMagnitudesBuffer, для AllMaxima пути или для median-стратегии.
+//         - Прямые void* буферы (а не BufferSet) — historical, миграция на
+//           BufferSet — TODO. Не блокер, фасад работает корректно.
+//         - GetProfilingData — агрегирует метрики ProfilingFacade per-stage.
+//         - prof_events перегрузки методов (с/без аргумента) — production
+//           путь без overhead'а сборки событий, benchmark-путь — с явным
+//           prof_events*.
+//
+// Использование:
+//   auto proc = std::make_unique<SpectrumProcessorROCm>(rocm_backend);
+//   SpectrumParams params{.antenna_count=1024, .n_point=1100,
+//                          .sample_rate=10e6f, .peak_mode=PeakSearchMode::ONE_PEAK};
+//   proc->Initialize(params);
+//   auto results = proc->ProcessFromCPU(iq_data);
+//   // или:
+//   auto all_max = proc->FindAllMaximaFromCPU(iq_data, OutputDestination::CPU, 1, 0);
+//
+// История:
+//   - Создан:  2026-02-23 (ROCm-реализация ISpectrumProcessor, Strategy)
+//   - Изменён: 2026-04-15 (миграция в DSP-GPU/spectrum, Ref03 Op'ы как Layer 5)
+// ============================================================================
 
 #if ENABLE_ROCM
 
@@ -46,14 +82,15 @@ using ROCmProfEvents = std::vector<std::pair<const char*, drv_gpu_lib::ROCmProfi
 
 /**
  * @class SpectrumProcessorROCm
- * @brief ROCm implementation: hipFFT + post-kernel + AllMaxima pipeline
+ * @brief Layer 6 Ref03 фасад: hipFFT + post-kernel + AllMaxima pipeline на ROCm.
  *
- * Lifecycle:
- *   1. Construct with IBackend* (ROCm backend)
- *   2. Initialize(params) — allocates buffers, creates FFT plan, compiles kernels
- *   3. ProcessFromCPU / ProcessFromGPU / FindAllMaxima...
- *   4. Destructor releases all resources
- *
+ * @note Move/copy запрещены — owns hipFFT plans + kernel modules + GPU buffers.
+ * @note Требует #if ENABLE_ROCM. На non-ROCm сборках — stub с runtime_error.
+ * @note Lifecycle: ctor(backend) → Initialize(params) → Process*/FindAllMaxima* → dtor.
+ * @note Не thread-safe. Один экземпляр = один владелец GPU-ресурсов.
+ * @see ISpectrumProcessor — интерфейс (Strategy + Bridge)
+ * @see SpectrumProcessorFactory — создание по BackendType
+ * @see AllMaximaPipelineROCm — отдельный pipeline для FindAllMaxima
  * @ingroup grp_fft_func
  */
 class SpectrumProcessorROCm : public ISpectrumProcessor {

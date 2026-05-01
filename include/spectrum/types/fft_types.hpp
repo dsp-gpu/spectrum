@@ -2,10 +2,14 @@
 
 /**
  * @file fft_types.hpp
- * @brief Индекс всех типов fft_processor
+ * @brief Aggregator: подключает все типы fft_processor (modes + params + results).
  *
- * @author Кодо (AI Assistant)
- * @date 2026-02-15
+ * @note Тип B (technical header): только #include'ы, без объявлений.
+ *       Удобно подключать одной строкой в кодах потребителей FFTProcessor.
+ *
+ * История:
+ *   - Создан:  2026-02-15
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 #include <spectrum/types/fft_modes.hpp>

@@ -2,10 +2,14 @@
 
 /**
  * @file spectrum_types.hpp
- * @brief Индекс всех типов fft_func (spectrum maxima)
+ * @brief Aggregator: подключает все типы spectrum maxima (modes + params + results + profiling).
  *
- * @author Кодо (AI Assistant)
- * @date 2026-02-15
+ * @note Тип B (technical header): только #include'ы, без объявлений.
+ *       Удобно подключать одной строкой потребителями SpectrumMaximaFinder.
+ *
+ * История:
+ *   - Создан:  2026-02-15
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 #include <spectrum/types/spectrum_modes.hpp>

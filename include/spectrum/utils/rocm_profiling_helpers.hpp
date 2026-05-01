@@ -1,15 +1,38 @@
 #pragma once
 
-/**
- * @file rocm_profiling_helpers.hpp
- * @brief Shared helpers for converting HIP events / wall-clock to ROCmProfilingData
- *
- * Used by FFTProcessorROCm, SpectrumProcessorROCm, and other fft_func classes.
- * Eliminates copy-paste of MakeROCmDataFromEvents / MakeROCmDataFromClock.
- *
- * @author Kodo (AI Assistant)
- * @date 2026-03-22
- */
+// ============================================================================
+// rocm_profiling_helpers — конвертеры hipEvent / wall-clock в ROCmProfilingData
+//
+// ЧТО:    Две inline-функции в namespace fft_func_utils:
+//           - MakeROCmDataFromEvents(ev_start, ev_end, kind, op) — для GPU-замеров;
+//           - MakeROCmDataFromClock(t_start, t_end, kind, op)    — для CPU-операций.
+//         Возвращают готовый ROCmProfilingData для подачи в ProfilingFacade::Record.
+//
+// ЗАЧЕМ:  FFTProcessorROCm, SpectrumProcessorROCm, фильтры, lch_farrow_rocm —
+//         все одинаково собирают hipEventElapsedTime и заполняют структуру.
+//         Раньше это копипастилось в каждом классе. Helpers устраняют дублирование.
+//
+// ПОЧЕМУ: - Inline + header-only → zero overhead, один include во всех клиентах.
+//         - Read-only по событиям: НЕ вызывают hipEventDestroy (с 2026-04-15).
+//           Раньше делался destroy → double-free с ScopedHipEvent. Сейчас
+//           владение остаётся за caller'ом (обычно ScopedHipEvent через RAII).
+//         - Свободные функции (не методы класса) → caller не плодит instance,
+//           использует напрямую без singleton/factory boilerplate.
+//
+// Использование:
+//   drv_gpu_lib::ScopedHipEvent ev_s, ev_e;
+//   ev_s.CreateOrThrow(); ev_e.CreateOrThrow();
+//   hipEventRecord(ev_s.get(), stream);
+//   // ... kernel launch ...
+//   hipEventRecord(ev_e.get(), stream);
+//   auto data = fft_func_utils::MakeROCmDataFromEvents(
+//       ev_s.get(), ev_e.get(), 0, "FFT_C2C");
+//   ProfilingFacade::GetInstance().Record(gpu_id, "spectrum", "fft", data);
+//
+// История:
+//   - Создан:  2026-03-22 (устранение копипасты в fft_func классах)
+//   - Изменён: 2026-04-15 (убран hipEventDestroy — все клиенты на ScopedHipEvent)
+// ============================================================================
 
 #if ENABLE_ROCM
 
@@ -20,7 +43,7 @@
 
 namespace fft_func_utils {
 
-/// Convert hipEvent pair → ROCmProfilingData.
+/// Конвертирует пару hipEvent_t → ROCmProfilingData (для GPU-замеров).
 ///
 /// @note Read-only: НЕ вызывает hipEventDestroy.
 ///       Владение событиями остаётся за вызывающим (обычно ScopedHipEvent).
@@ -41,7 +64,7 @@ inline drv_gpu_lib::ROCmProfilingData MakeROCmDataFromEvents(
   return d;
 }
 
-/// Convert wall-clock time pair → ROCmProfilingData (for synchronous CPU-side operations)
+/// Конвертирует пару wall-clock timestamp'ов → ROCmProfilingData (для синхронных CPU-операций).
 inline drv_gpu_lib::ROCmProfilingData MakeROCmDataFromClock(
     std::chrono::high_resolution_clock::time_point t_start,
     std::chrono::high_resolution_clock::time_point t_end,

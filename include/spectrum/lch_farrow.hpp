@@ -1,23 +1,41 @@
 #pragma once
 
-#if !ENABLE_ROCM  // OpenCL-only: ROCm uses LchFarrowROCm
+#if !ENABLE_ROCM  // OpenCL-only: ROCm-сборка использует LchFarrowROCm
 
-/**
- * @file lch_farrow.hpp
- * @brief LchFarrow - Lagrange interpolation fractional delay processor (48x5)
- *
- * Standalone module for applying fractional delay to complex signals on GPU.
- * Uses Lagrange 5-point interpolation with pre-computed 48x5 coefficient matrix.
- *
- * Algorithm:
- *   For each output sample n:
- *     read_pos = n - delay_samples
- *     if read_pos < 0: output[n] = 0
- *     else: output[n] = 5-point Lagrange interpolation of input at read_pos
- *
- * @author Kodo (AI Assistant)
- * @date 2026-02-18
- */
+// ============================================================================
+// LchFarrow — fractional-delay интерполятор Лагранжа 48×5 (OpenCL)
+//
+// ЧТО:    Самостоятельный модуль для применения дробной задержки к comple-IQ
+//         сигналу на GPU. Использует 5-точечную интерполяцию Лагранжа с
+//         предвычисленной матрицей коэффициентов 48×5 (240 float).
+//
+// ЗАЧЕМ:  В радарных pipeline'ах задержки между антеннами — нецелое число
+//         сэмплов (зависит от геометрии решётки и угла). Без fractional delay
+//         beamforming работает только на сетке сэмплов → big quantization
+//         loss. Lagrange 48×5 даёт sub-sample sub-degree точность с малыми
+//         накладными расходами.
+//
+// ПОЧЕМУ: - 48 фаз × 5 точек: 48 интерполяционных позиций между сэмплами
+//           (≈ 1/48 сэмпла разрешение) × 5-tap Лагранжа (4-й порядок).
+//           Trade-off: точность vs scratch memory (240 float ≈ 960 байт).
+//         - Для каждой антенны read_pos = n − delay_samples; если read_pos<0
+//           (сигнал ещё не пришёл) → output=0. Это намеренно (causality).
+//         - Этот файл — ТОЛЬКО OpenCL-вариант (legacy nvidia-ветка).
+//           Под `#if !ENABLE_ROCM`. ROCm/HIP реализация в lch_farrow_rocm.hpp.
+//         - Move-only (no copy): GPU-ресурсы (cl_program, cl_kernel, cl_mem)
+//           уникальны на инстанс, копирование = double-release.
+//
+// Использование:
+//   lch_farrow::LchFarrow processor(backend);
+//   processor.SetDelays({0.0f, 1.5f, 3.0f});  // микросекунды, на антенну
+//   processor.SetSampleRate(1e6f);
+//   auto result = processor.Process(input_buf, antennas, points);
+//   // result.data — cl_mem задержанного сигнала; caller освобождает
+//   // через clReleaseMemObject().
+//
+// История:
+//   - Создан: 2026-02-18 (legacy OpenCL-ветка)
+// ============================================================================
 
 #include <core/interface/i_backend.hpp>
 #include <core/interface/input_data.hpp>
@@ -37,23 +55,12 @@ using ProfEvents = std::vector<std::pair<const char*, cl_event>>;
 
 /**
  * @class LchFarrow
- * @brief GPU fractional delay processor (Lagrange 48x5)
+ * @brief OpenCL fractional-delay процессор (Lagrange 48×5).
  *
- * Applies per-antenna fractional delay to an already-generated complex signal.
- * Independent from signal_generators module.
- *
- * @code
- * LchFarrow processor(backend);
- * processor.SetDelays({0.0f, 1.5f, 3.0f});
- * processor.SetSampleRate(1e6f);
- *
- * // From existing GPU buffer
- * auto result = processor.Process(input_buf, antennas, points);
- * // result.data is cl_mem (delayed signal)
- *
- * // Or from CPU data
- * auto cpu_result = processor.ProcessCpu(input_data, antennas, points);
- * @endcode
+ * @note Move-only: GPU-ресурсы уникальны на инстанс.
+ * @note Не зависит от signal_generators — работает с уже сгенерированным сигналом.
+ * @note Доступен только при `#if !ENABLE_ROCM`. ROCm-вариант: LchFarrowROCm.
+ * @see lch_farrow::LchFarrowROCm
  */
 class LchFarrow {
 public:

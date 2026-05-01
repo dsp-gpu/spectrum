@@ -2,18 +2,21 @@
 
 /**
  * @file iir_kernels_rocm.hpp
- * @brief HIP kernel sources for IIR biquad cascade filter (ROCm)
+ * @brief HIP kernel-source для IIR biquad cascade фильтра (Direct Form II Transposed).
  *
- * Port of iir_kernels.hpp (OpenCL) to HIP/ROCm.
- * Uses hiprtc for runtime compilation.
+ * @note Тип B (technical header): R"HIP(...)HIP" source для hiprtc.
+ *       Kernel: iir_biquad_cascade_cf32
+ *         - 1D grid: один поток на канал (рекурсия y[n] = f(y[n-1], y[n-2]) — sequential!)
+ *         - Каждый поток: ВСЕ samples для своего канала × ВСЕ биквады каскада
+ *         - Direct Form II Transposed — numerically stable форма (минимум quantization noise)
+ *         - SOS layout: sos[section·5 + {0:b0, 1:b1, 2:b2, 3:a1, 4:a2}], a0=1
+ * @note Порт из iir_kernels.hpp (OpenCL → HIP/ROCm).
+ * @note ⚠️ Численная стабильность: высокие порядки (>8 биквадов) — рекомендован double
+ *       state (FilterPrecision::Float64), float может терять precision на резонансах.
  *
- * Kernel: iir_biquad_cascade_cf32
- *   - 1D grid: one thread per channel
- *   - Each thread: ALL samples for one channel, ALL biquad sections
- *   - Direct Form II Transposed (numerically stable)
- *
- * @author Kodo (AI Assistant)
- * @date 2026-02-23
+ * История:
+ *   - Создан:  2026-02-23
+ *   - Изменён: 2026-05-01 (унификация формата шапки под dsp-asst RAG-индексер)
  */
 
 namespace filters {
