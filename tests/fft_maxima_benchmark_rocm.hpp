@@ -1,20 +1,22 @@
 #pragma once
 
+// ============================================================================
+// fft_maxima_benchmark_rocm — базовые классы бенчмарков SpectrumProcessorROCm
+//
+// ЧТО:    SpectrumProcessorROCmBenchmark + SpectrumProcessorROCmAllMaximaBenchmark —
+//         наследники GpuBenchmarkBase для замера производительности spectrum maxima.
+// ЗАЧЕМ:  Отделяет benchmark-логику (warmup + measure + Export) от production-кода.
+//         Используется из test_fft_maxima_benchmark_rocm.hpp как runner.
+// ПОЧЕМУ: Паттерн GpuBenchmarkBase — единый способ профилирования GPU-операций
+//         с ProfilingFacade (правило 06).
+//
+// История: Создан: 2026-03-01
+// ============================================================================
+
 /**
  * @file fft_maxima_benchmark_rocm.hpp
- * @brief ROCm benchmark-классы для SpectrumProcessorROCm (GpuBenchmarkBase)
- *
- * SpectrumProcessorROCmBenchmark         → ProcessFromCPU:
- *   Upload(H2D) + PadKernel + FFT + PostKernel + Download(D2H)
- *
- * SpectrumProcessorROCmAllMaximaBenchmark → FindAllMaximaFromCPU:
- *   Upload(H2D) + PadKernel + FFT + ComputeMagnitudes + Pipeline
- *
- * Запускается ТОЛЬКО на Linux + AMD GPU (ENABLE_ROCM=1).
- * На Windows/без AMD: compile-only, не выполняется.
- *
- * @author Кодо (AI Assistant)
- * @date 2026-03-01
+ * @brief ROCm benchmark-классы для SpectrumProcessorROCm (GpuBenchmarkBase).
+ * @note Не публичный API. Запускается через test_fft_maxima_benchmark_rocm.hpp.
  */
 
 #if ENABLE_ROCM

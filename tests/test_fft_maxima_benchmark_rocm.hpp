@@ -1,5 +1,16 @@
 #pragma once
 
+// ============================================================================
+// test_fft_maxima_benchmark_rocm — бенчмарк SpectrumProcessorROCm (ROCm)
+//
+// ЧТО:    2 бенчмарка: ProcessFromCPU (ONE_PEAK) и FindAllMaximaFromCPU.
+//         Стадии: Upload+PadKernel+FFT+PostKernel+Download / +ComputeMagnitudes.
+// ЗАЧЕМ:  SpectrumMaximaFinder — в radar pipeline (поиск целей). Регрессии критичны.
+// ПОЧЕМУ: ENABLE_ROCM. Результаты → Results/Profiler/.
+//
+// История: Создан: 2026-04-12
+// ============================================================================
+
 /**
  * @file test_fft_maxima_benchmark_rocm.hpp
  * @brief ROCm test runner: SpectrumProcessorROCm benchmark (GpuBenchmarkBase)

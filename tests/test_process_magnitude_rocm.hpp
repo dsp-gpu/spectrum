@@ -1,5 +1,18 @@
 #pragma once
 
+// ============================================================================
+// test_process_magnitude_rocm — тесты ComplexToMagPhaseROCm (ROCm)
+//
+// ЧТО:    6 тестов: gpu_input_no_norm, managed_norm_by_n (÷N),
+//         norm_zero_signal, to_gpu (output stays on GPU),
+//         multi_beam_managed (4×4096), to_buffer (zero allocations).
+// ЗАЧЕМ:  ProcessMagnitude — первый этап после FFT. Ошибка нормализации
+//         = неверный масштаб спектра во всех downstream тестах.
+// ПОЧЕМУ: ENABLE_ROCM. MIGRATED to test_utils 2026-03-23.
+//
+// История: Создан: 2026-04-12
+// ============================================================================
+
 /**
  * @file test_process_magnitude_rocm.hpp
  * @brief Tests for ComplexToMagPhaseROCm::ProcessMagnitude / ProcessMagnitudeToGPU

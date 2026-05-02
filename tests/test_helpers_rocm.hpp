@@ -1,22 +1,22 @@
 #pragma once
 
+// ============================================================================
+// test_helpers_rocm — утилиты для ROCm-тестов spectrum
+//
+// ЧТО:    Хелперы для тестов: выделение unified memory (hipMallocManaged),
+//         построение InputData<void*> для complex<float> и float magnitude.
+// ЗАЧЕМ:  Устраняет дублирование setup-кода в каждом test_*_rocm.hpp.
+// ПОЧЕМУ: hipMallocManaged позволяет заполнять буфер на CPU без hipMemcpy;
+//         caller управляет временем жизни (hipFree) — RAII не нужен в тестах.
+//
+// История: Создан: 2026-04-12
+// ============================================================================
+
 /**
  * @file test_helpers_rocm.hpp
- * @brief Test helpers for ROCm tests using hipMallocManaged (unified memory)
- *
- * Unified memory (hipMallocManaged) allows CPU to fill data and GPU to read
- * it directly without explicit hipMemcpy. Use for small test datasets only.
- *
- * Usage:
- *   void* ptr = AllocateManagedForTest(n * sizeof(std::complex<float>));
- *   auto* data = static_cast<std::complex<float>*>(ptr);
- *   // fill data on CPU...
- *   auto input = MakeManagedInput(ptr, beam_count, n_point);
- *   // call ProcessMagnitude(input.data, params, input.gpu_memory_bytes)
- *   hipFree(ptr);  // caller is responsible
- *
- * @author Kodo (AI Assistant)
- * @date 2026-03-11
+ * @brief Хелперы ROCm тестов — unified memory (hipMallocManaged) для малых датасетов
+ * @note Test fixture, не публичный API. Используется из test_*_rocm.hpp через include.
+ *       Caller отвечает за hipFree выделенного ptr (RAII не оборачиваем — простота тестов).
  */
 
 #if ENABLE_ROCM

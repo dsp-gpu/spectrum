@@ -1,5 +1,17 @@
 #pragma once
 
+// ============================================================================
+// test_moving_average_rocm — тесты MovingAverageFilterROCm (ROCm)
+//
+// ЧТО:    6 тестов: EMA/SMA/MMA/DEMA/TEMA (8ch×4096pts GPU vs CPU),
+//         step_response (5 типов фильтров, 120pts, table output).
+// ЗАЧЕМ:  Moving averages — в baseline estimation и CFAR detector.
+//         Ошибка здесь = неверный шумовой порог в radar.
+// ПОЧЕМУ: ENABLE_ROCM. Эталон CPU. MIGRATED to test_utils 2026-03-23.
+//
+// История: Создан: 2026-04-12
+// ============================================================================
+
 /**
  * @file test_moving_average_rocm.hpp
  * @brief ROCm tests for MovingAverageFilterROCm (SMA, EMA, MMA, DEMA, TEMA)

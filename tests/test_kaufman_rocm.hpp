@@ -1,5 +1,17 @@
 #pragma once
 
+// ============================================================================
+// test_kaufman_rocm — тесты KaufmanFilterROCm (KAMA adaptive, ROCm)
+//
+// ЧТО:    5 тестов: gpu_vs_cpu, trend (ER~1 → fast tracking),
+//         noise (ER~0 → frozen KAMA), adaptive_transition, step_demo.
+// ЗАЧЕМ:  KAMA — адаптивная скользящая средняя (Kaufman AMA).
+//         Ошибка в ER-расчёте = неверная адаптация к шуму/тренду.
+// ПОЧЕМУ: ENABLE_ROCM. Эталон CPU. MIGRATED to test_utils 2026-03-23.
+//
+// История: Создан: 2026-04-12
+// ============================================================================
+
 /**
  * @file test_kaufman_rocm.hpp
  * @brief ROCm tests for KaufmanFilterROCm (KAMA)

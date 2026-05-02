@@ -1,5 +1,17 @@
 #pragma once
 
+// ============================================================================
+// test_lch_farrow_rocm — тесты LchFarrowROCm (fractional delay, ROCm)
+//
+// ЧТО:    4 теста: zero delay (output==input), integer delay (5 samples),
+//         fractional delay (2.7 samples), multi-antenna (4 ant, разные delays).
+// ЗАЧЕМ:  Farrow resampler — для компенсации временных задержек антенн.
+//         Ошибка фазы = неверный beamforming.
+// ПОЧЕМУ: ENABLE_ROCM (не запускается на Windows). Эталон CPU reference.
+//
+// История: Создан: 2026-04-12
+// ============================================================================
+
 /**
  * @file test_lch_farrow_rocm.hpp
  * @brief ROCm tests for LchFarrowROCm fractional delay processor

@@ -1,5 +1,17 @@
 #pragma once
 
+// ============================================================================
+// test_fft_cpu_reference_rocm — GPU hipFFT vs CPU pocketfft (точность)
+//
+// ЧТО:    4 теста: c2c_sinusoid, r2c_real_signal, c2c_multi_beam (4 луча),
+//         magnitude_match (|X_gpu| vs |X_cpu| поэлементно).
+// ЗАЧЕМ:  Верифицирует точность hipFFT против CPU-эталона pocketfft.
+//         Ошибки точности невидимы без cross-validation с CPU.
+// ПОЧЕМУ: ENABLE_ROCM. Эталон — pocketfft (не FFTW, без внешней зависимости).
+//
+// История: Создан: 2026-04-16
+// ============================================================================
+
 /**
  * @file test_fft_cpu_reference_rocm.hpp
  * @brief GPU FFT vs CPU reference (pocketfft) — валидация точности

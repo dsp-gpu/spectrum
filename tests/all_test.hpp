@@ -1,21 +1,21 @@
 #pragma once
 
+// ============================================================================
+// spectrum_all_test — агрегатор тестов модуля spectrum
+//
+// ЧТО:    Единая точка подключения всех test_*.hpp модуля spectrum.
+//         Функция run() последовательно запускает весь набор тестов.
+// ЗАЧЕМ:  main.cpp вызывает только этот файл — не отдельные test_*.hpp.
+//         Закомментированный include = выключенный тест без правки main.cpp.
+// ПОЧЕМУ: Паттерн all_test.hpp — из правила 15-cpp-testing.md.
+//
+// История: Создан: 2026-02-23
+// ============================================================================
+
 /**
  * @file all_test.hpp
- * @brief Test registry for lch_farrow module
- *
- * main.cpp calls this file - NOT individual tests directly.
- *
- * Тесты:
- *  - test_lch_farrow        : функциональные тесты (OpenCL)
- *  - test_lch_farrow_rocm   : функциональные тесты (ROCm)
- *
- * Бенчмарки (раскомментировать для запуска):
- *  - test_lch_farrow_benchmark      : OpenCL (GpuBenchmarkBase)
- *  - test_lch_farrow_benchmark_rocm : ROCm   (GpuBenchmarkBase)
- *
- * @author Kodo (AI Assistant)
- * @date 2026-02-18, обновлено 2026-03-01
+ * @brief Агрегатор всех тестов модуля spectrum.
+ * @note Не публичный API. Вызывается из main.cpp.
  */
 
 #if ENABLE_ROCM

@@ -1,5 +1,17 @@
 #pragma once
 
+// ============================================================================
+// test_fft_matrix_rocm — матрица замеров FFT (лучи × nFFT, ROCm/hipFFT)
+//
+// ЧТО:    20 значений beam_count × 13 значений nFFT. 3 таблицы:
+//         только FFT, GPU processing (Pad+FFT), полный цикл (Upload+Pad+FFT+Download).
+//         Контрольная точка 320×1024 до/после для оценки drift.
+// ЗАЧЕМ:  Позволяет выбрать оптимальную конфигурацию FFT для radar pipeline.
+// ПОЧЕМУ: Результаты → Results/Profiler/FFT_Matrix/fft_matrix_YYYY-MM-DD.md.
+//
+// История: Создан: 2026-04-12
+// ============================================================================
+
 /**
  * @file test_fft_matrix_rocm.hpp
  * @brief FFT Matrix Benchmark — таблица времени (лучи × nFFT) на ROCm/hipFFT

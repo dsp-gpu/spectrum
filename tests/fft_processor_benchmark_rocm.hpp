@@ -1,28 +1,21 @@
 #pragma once
 
+// ============================================================================
+// fft_processor_benchmark_rocm — бенчмарк FFTProcessorROCm (GpuBenchmarkBase)
+//
+// ЧТО:    FFTProcessorBenchmarkROCm — наследник GpuBenchmarkBase.
+//         Stages: Upload(H2D) + Pad(kernel) + FFT(hipfftExecC2C) + Download(D2H).
+// ЗАЧЕМ:  Production-класс FFTProcessorROCm не содержит кода профилирования.
+//         Бенчмарк добавляет измерение через ROCmProfEvents + ProfilingFacade::BatchRecord.
+// ПОЧЕМУ: Разделение production / profiling — SRP. Паттерн GpuBenchmarkBase (правило 06).
+//
+// История: Создан: 2026-03-01
+// ============================================================================
+
 /**
  * @file fft_processor_benchmark_rocm.hpp
- * @brief FFTProcessorBenchmarkROCm — наследник GpuBenchmarkBase для FFTProcessorROCm
- *
- * Пример использования:
- * @code
- *   FFTProcessorROCm proc(backend);
- *   FFTProcessorBenchmarkROCm bench(backend, proc, params, input_data);
- *   bench.Run();     // warmup(5) + measure(20) → GPUProfiler
- *   bench.Report();  // profiler.PrintReport() + ExportJSON + ExportMarkdown
- * @endcode
- *
- * FFTProcessorROCm — ЧИСТЫЙ production-класс (ноль кода профилирования).
- * Профилирование через опциональный prof_events (ROCmProfEvents*):
- *  - ExecuteKernel()      → ProcessComplex(data, params)         — без событий
- *  - ExecuteKernelTimed() → ProcessComplex(data, params, &events) — с hipEvent_t
- *    → ProfilingFacade::BatchRecord(events) — одним вызовом в profiler v2
- *
- * Stages: Upload (H2D), Pad (kernel), FFT (hipfftExecC2C), Download (D2H)
- *
- * @author Кодо (AI Assistant)
- * @date 2026-03-01
- * @see GpuBenchmarkBase, MemoryBank/specs/Profil_GPU.md
+ * @brief FFTProcessorBenchmarkROCm — наследник GpuBenchmarkBase для FFTProcessorROCm.
+ * @note Не публичный API. Запускается через test_fft_benchmark_rocm.hpp.
  */
 
 #if ENABLE_ROCM

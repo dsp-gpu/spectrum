@@ -1,23 +1,21 @@
 #pragma once
 
+// ============================================================================
+// lch_farrow_benchmark_rocm — базовый класс бенчмарка LchFarrowROCm
+//
+// ЧТО:    LchFarrowBenchmarkROCm — наследник GpuBenchmarkBase для LchFarrowROCm.
+//         Stages: Upload_input + Upload_delay + Kernel (lch_farrow_delay).
+// ЗАЧЕМ:  Production-класс LchFarrowROCm не содержит кода профилирования.
+//         Бенчмарк добавляет измерение через ROCmProfEvents + ProfilingFacade::BatchRecord.
+// ПОЧЕМУ: SRP — profiling отдельно от production. Паттерн GpuBenchmarkBase (правило 06).
+//
+// История: Создан: 2026-03-01
+// ============================================================================
+
 /**
  * @file lch_farrow_benchmark_rocm.hpp
- * @brief LchFarrowBenchmarkROCm — наследник GpuBenchmarkBase для LchFarrowROCm
- *
- * LchFarrowROCm — ЧИСТЫЙ production-класс (ноль кода профилирования).
- * Профилирование через опциональный prof_events (ROCmProfEvents*):
- *  - ExecuteKernel()      → ProcessFromCPU(...) — без событий (warmup)
- *  - ExecuteKernelTimed() → ProcessFromCPU(..., &events) — с hipEvent_t
- *    → ProfilingFacade::BatchRecord(events) — одним вызовом в profiler v2
- *
- * Stages (ProcessFromCPU):
- *  - Upload_input : hipMemcpyHtoDAsync (входной сигнал → GPU)
- *  - Upload_delay : hipMemcpyHtoDAsync (delay_us → GPU)
- *  - Kernel       : lch_farrow_delay (hipModuleLaunchKernel)
- *
- * @author Кодо (AI Assistant)
- * @date 2026-03-01
- * @see GpuBenchmarkBase, Doc_Addition/GPU_Profiling_Mechanism.md
+ * @brief LchFarrowBenchmarkROCm — наследник GpuBenchmarkBase для LchFarrowROCm.
+ * @note Не публичный API. Запускается через test_lch_farrow_benchmark_rocm.hpp.
  */
 
 #if ENABLE_ROCM

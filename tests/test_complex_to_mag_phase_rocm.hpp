@@ -1,21 +1,22 @@
 #pragma once
 
+// ============================================================================
+// TestComplexToMagPhaseROCm — тесты ComplexToMagPhaseROCm (mag/phase conversion)
+//
+// ЧТО:    6 тестов: single_beam_cpu, multi_beam_cpu, gpu_input,
+//         cpu_to_gpu, gpu_to_gpu, accuracy (edge cases).
+// ЗАЧЕМ:  Проверяет корректность преобразования complex → magnitude + phase
+//         на GPU (ROCm/HIP), включая multi-beam и void* GPU-input варианты.
+// ПОЧЕМУ: Мигрирован в test_utils (2026-03-23) — унифицированная инфраструктура тестов.
+//         Сравнение с CPU-эталоном через тестовые утилиты.
+//
+// История: Создан: 2026-03-01
+// ============================================================================
+
 /**
- * @file test_complex_to_mag_phase_rocm.hpp
- * @brief Tests for ComplexToMagPhaseROCm -- direct complex->mag+phase conversion
- *
- * ✅ MIGRATED to test_utils (2026-03-23)
- *
- * Tests:
- * 1. single_beam_cpu    — CPU→CPU sinusoid, mag/phase accuracy
- * 2. multi_beam_cpu     — 8 beams varying amplitude
- * 3. gpu_input          — external GPU input → CPU output
- * 4. cpu_to_gpu         — ProcessToGPU interleaved output
- * 5. gpu_to_gpu         — full GPU pipeline
- * 6. accuracy           — edge cases (zero, pure real/imag, 3-4-5, large/small)
- *
- * @author Kodo (AI Assistant)
- * @date 2026-03-01 (migrated 2026-03-23)
+ * @class TestComplexToMagPhaseROCm
+ * @brief Тест-фикстура для ComplexToMagPhaseROCm (mag/phase, multi-beam, GPU void* input).
+ * @note Не публичный API. Запускается через all_test.hpp.
  */
 
 #if ENABLE_ROCM

@@ -1,8 +1,21 @@
 #pragma once
 
+// ============================================================================
+// test_fir_basic — FIR коэффициенты для тестов filters
+//
+// ЧТО:    64-tap LP FIR коэффициенты (scipy firwin/hamming, cutoff=0.1).
+//         Shared константы для test_filters_rocm + filter benchmarks.
+// ЗАЧЕМ:  Единый источник эталонных коэффициентов — исключает расхождение
+//         между тестами и бенчмарками.
+// ПОЧЕМУ: scipy.signal.firwin(64, 0.1, window='hamming') — воспроизводимо.
+//
+// История: Создан: 2026-04-12
+// ============================================================================
+
 /**
  * @file test_fir_basic.hpp
- * @brief Shared FIR filter test coefficients for filters tests
+ * @brief Общие FIR коэффициенты (64-tap LP, scipy firwin/hamming) для тестов filters
+ * @note Test fixture, не публичный API. Подключается из test_filters_rocm.hpp и бенчмарков.
  */
 
 #include <vector>

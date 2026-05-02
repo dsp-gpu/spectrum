@@ -1,23 +1,22 @@
 #pragma once
 
+// ============================================================================
+// test_filters_rocm — тесты FirFilterROCm + IirFilterROCm (ROCm)
+//
+// ЧТО:    GPU vs CPU reference, multichannel, void* input.
+//         FIR: 64/256-tap. IIR: Butterworth multi-section.
+// ЗАЧЕМ:  Фильтры — базовая DSP-операция. Ошибки в фазе/амплитуде
+//         дают неверный спектр после FFT.
+// ПОЧЕМУ: ENABLE_ROCM. Эталон — CPU reference implementation.
+//
+// История: Создан: 2026-04-12
+// ============================================================================
+
 /**
  * @file test_filters_rocm.hpp
- * @brief ROCm tests for FirFilterROCm and IirFilterROCm
- *
- * MIGRATED to test_utils (2026-03-23)
- *
- * Tests:
- *   1. fir_basic: 64-tap LP, GPU vs CPU reference (8ch x 4096pts)
- *   2. fir_large: 256-tap LP, multichannel (16ch x 8192pts)
- *   3. fir_gpu_ptr: Process(void*) direct GPU pointer
- *   4. iir_basic: Butterworth 2nd order, GPU vs CPU (8ch x 4096pts)
- *   5. iir_multi_section: 4th order (2 sections), GPU vs CPU
- *   6. iir_gpu_ptr: Process(void*) direct GPU pointer
- *
- * IMPORTANT: Compiles ONLY with ENABLE_ROCM=1.
- *
- * @author Kodo (AI Assistant)
- * @date 2026-02-23 (migrated 2026-03-23)
+ * @brief Тесты FirFilterROCm + IirFilterROCm — GPU vs CPU reference, multichannel, void* input
+ * @note Test fixture, не публичный API. Запускается через all_test.hpp.
+ *       Компилируется ТОЛЬКО при ENABLE_ROCM=1. FIR 64/256-tap, IIR Butterworth multi-section.
  */
 
 #include <vector>

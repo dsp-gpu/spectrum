@@ -1,5 +1,17 @@
 #pragma once
 
+// ============================================================================
+// test_spectrum_maxima_rocm — тесты SpectrumProcessorROCm (peak finding, ROCm)
+//
+// ЧТО:    6 тестов: one_peak (CW 100Hz), two_peaks (2 CW), find_all_maxima
+//         (3 синусоиды→3 пика), all_maxima_fft, batch_16_beams, compare_opencl (SKIP).
+// ЗАЧЕМ:  SpectrumMaximaFinder — детектирует цели в radar pipeline.
+//         Пропуск пика = незамеченная цель; ложный пик = ложная тревога.
+// ПОЧЕМУ: ENABLE_ROCM. MIGRATED to test_utils 2026-03-23.
+//
+// История: Создан: 2026-04-12
+// ============================================================================
+
 /**
  * @file test_spectrum_maxima_rocm.hpp
  * @brief ROCm tests for SpectrumProcessorROCm (peak finding)

@@ -1,5 +1,17 @@
 #pragma once
 
+// ============================================================================
+// test_gate3_fft_profiler_v2 — Gate 3: FFT → ProfilingFacade v2 (Phase D)
+//
+// ЧТО:    Реальный FFT (hipFFT + pad + download) → 20 итераций BatchRecord
+//         → WaitEmpty → ExportJsonAndMarkdown → ProfileAnalyzer (L1/L2/L3).
+// ЗАЧЕМ:  Gate 3 верифицирует интеграцию ProfilingFacade v2 с реальным GPU kernel.
+//         Проверяет: stddev>0, p95>=median, MemoryBound classification.
+// ПОЧЕМУ: ENABLE_ROCM. WaitEmpty обязателен до Export (правило 06).
+//
+// История: Создан: 2026-04-20
+// ============================================================================
+
 /**
  * @file test_gate3_fft_profiler_v2.hpp
  * @brief Phase D Gate 3 — integration test: real FFT kernel → ProfilingFacade v2

@@ -1,5 +1,16 @@
 #pragma once
 
+// ============================================================================
+// test_filters_benchmark_rocm — бенчмарк FirFilterROCm + IirFilterROCm
+//
+// ЧТО:    2 бенчмарка: FirFilterROCm::ProcessFromCPU и IirFilterROCm::ProcessFromCPU.
+//         5 warmup + 20 замерных → PrintReport + ExportJSON + ExportMarkdown.
+// ЗАЧЕМ:  FIR/IIR фильтры — в каждом radar pipeline. Регрессии производительности.
+// ПОЧЕМУ: Нет AMD GPU → [SKIP]. Results/Profiler/GPU_00_FirFilter_ROCm/.
+//
+// История: Создан: 2026-03-01
+// ============================================================================
+
 /**
  * @file test_filters_benchmark_rocm.hpp
  * @brief Test runner: FirFilterROCm + IirFilterROCm benchmark (GpuBenchmarkBase)

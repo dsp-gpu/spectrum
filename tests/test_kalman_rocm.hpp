@@ -1,5 +1,18 @@
 #pragma once
 
+// ============================================================================
+// test_kalman_rocm — тесты KalmanFilterROCm (1D scalar Kalman, ROCm)
+//
+// ЧТО:    5 тестов: gpu_vs_cpu (8ch×4096pts), const_signal (convergence),
+//         channel_independence (256ch), step_response (step at n=512),
+//         lfm_radar_demo (5 targets + AWGN + Kalman).
+// ЗАЧЕМ:  Kalman — адаптивный фильтр для сглаживания radar tracks.
+//         Ошибка сходимости = неверные траектории целей.
+// ПОЧЕМУ: ENABLE_ROCM. Эталон CPU. MIGRATED to test_utils 2026-03-23.
+//
+// История: Создан: 2026-04-12
+// ============================================================================
+
 /**
  * @file test_kalman_rocm.hpp
  * @brief ROCm tests for KalmanFilterROCm (1D scalar Kalman)

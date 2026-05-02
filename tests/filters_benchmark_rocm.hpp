@@ -1,18 +1,21 @@
 #pragma once
 
+// ============================================================================
+// filters_benchmark_rocm — базовые классы бенчмарков FirFilterROCm / IirFilterROCm
+//
+// ЧТО:    FirFilterROCmBenchmark + IirFilterROCmBenchmark — наследники GpuBenchmarkBase.
+//         Stages: Upload(H2D) + Kernel.
+// ЗАЧЕМ:  Отделяет benchmark-логику (warmup + measure + Export) от production-кода фильтров.
+//         Используется из test_filters_benchmark_rocm.hpp как runner.
+// ПОЧЕМУ: Паттерн GpuBenchmarkBase — единый способ профилирования GPU-операций (правило 06).
+//
+// История: Создан: 2026-03-01
+// ============================================================================
+
 /**
  * @file filters_benchmark_rocm.hpp
- * @brief ROCm benchmark-классы для FirFilterROCm и IirFilterROCm (GpuBenchmarkBase)
- *
- * FirFilterROCmBenchmark  → ProcessFromCPU:  Upload(H2D) + Kernel
- * IirFilterROCmBenchmark  → ProcessFromCPU:  Upload(H2D) + Kernel
- *
- * Запускается ТОЛЬКО на Linux + AMD GPU (ENABLE_ROCM=1).
- * На Windows/без AMD: compile-only, не выполняется.
- *
- * @author Кодо (AI Assistant)
- * @date 2026-03-01
- * @see GpuBenchmarkBase, MemoryBank/tasks/TASK_filters_profiling.md
+ * @brief ROCm benchmark-классы для FirFilterROCm и IirFilterROCm (GpuBenchmarkBase).
+ * @note Не публичный API. Запускается через test_filters_benchmark_rocm.hpp.
  */
 
 #if ENABLE_ROCM

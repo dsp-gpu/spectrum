@@ -1,5 +1,16 @@
 #pragma once
 
+// ============================================================================
+// test_fft_benchmark_rocm — бенчмарк FFTProcessorROCm (GpuBenchmarkBase)
+//
+// ЧТО:    5 warmup + 20 замерных FFT → ProfilingFacade (min/max/avg).
+//         PrintReport + ExportJSON + ExportMarkdown → Results/Profiler/GPU_00_FFT_ROCm/.
+// ЗАЧЕМ:  FFT — ключевая операция spectrum. Бенчмарк детектирует регрессии.
+// ПОЧЕМУ: ENABLE_ROCM. GpuBenchmarkBase pattern.
+//
+// История: Создан: 2026-03-01
+// ============================================================================
+
 /**
  * @file test_fft_benchmark_rocm.hpp
  * @brief Бенчмарк FFTProcessorROCm через GpuBenchmarkBase

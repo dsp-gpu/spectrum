@@ -1,20 +1,22 @@
 #pragma once
 
+// ============================================================================
+// test_fft_processor_rocm — тесты FFTProcessorROCm (hipFFT C2C/MagPhase)
+//
+// ЧТО:    Single/batch beams, GPU void* input, C2C и MagPhase режимы.
+//         Частотный bin валидируется по known tone.
+// ЗАЧЕМ:  FFTProcessor — основа всего spectrum pipeline. Ошибка здесь
+//         ломает все downstream модули (stats, radar).
+// ПОЧЕМУ: ENABLE_ROCM. Сравнение с CPU референсом.
+//
+// История: Создан: 2026-04-12
+// ============================================================================
+
 /**
  * @file test_fft_processor_rocm.hpp
- * @brief Tests for FFTProcessorROCm -- hipFFT-based FFT processing
- *
- * ✅ MIGRATED to test_utils (2026-03-23)
- *
- * Tests:
- * 1. single_beam_complex  — known tone at 100 Hz → peak at expected bin
- * 2. multi_beam_batch     — 8 beams with freq_step
- * 3. mag_phase_consistency — mag/phase vs complex output
- * 4. mag_phase_freq       — frequency array validation
- * 5. gpu_input            — void* device pointer input
- *
- * @author Kodo (AI Assistant)
- * @date 2026-02-23 (migrated 2026-03-23)
+ * @brief Тесты FFTProcessorROCm — hipFFT C2C/MagPhase, single + batch beams, GPU void* input
+ * @note Test fixture, не публичный API. Запускается через all_test.hpp.
+ *       Сравнение с CPU референсом, частотный bin валидируется по known tone.
  */
 
 #if ENABLE_ROCM

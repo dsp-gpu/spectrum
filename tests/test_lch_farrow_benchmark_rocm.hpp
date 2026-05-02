@@ -1,5 +1,17 @@
 #pragma once
 
+// ============================================================================
+// test_lch_farrow_benchmark_rocm — бенчмарк LchFarrowROCm (GpuBenchmarkBase)
+//
+// ЧТО:    5 warmup + 20 замерных → ProfilingFacade. 8 антенн × 4096 точек,
+//         delays={0.3..7.9}мкс, sample_rate=1MHz.
+// ЗАЧЕМ:  LchFarrow — polyphase+Farrow fractional resampling для antenna delays.
+//         Регрессии производительности критичны для radar pipeline.
+// ПОЧЕМУ: ENABLE_ROCM. GpuBenchmarkBase. Результаты → Results/Profiler/.
+//
+// История: Создан: 2026-04-12
+// ============================================================================
+
 /**
  * @file test_lch_farrow_benchmark_rocm.hpp
  * @brief Бенчмарк LchFarrowROCm через GpuBenchmarkBase (ROCm/HIP)
